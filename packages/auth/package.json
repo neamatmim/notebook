@@ -1,0 +1,24 @@
+{
+  "name": "@notebook/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@notebook/db": "workspace:*",
+    "@notebook/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@notebook/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
