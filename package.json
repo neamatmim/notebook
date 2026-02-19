@@ -43,6 +43,8 @@
   "dependencies": {
     "@notebook/env": "workspace:*",
     "dotenv": "catalog:",
+    "nitro": "npm:nitro-nightly@3.0.1-20260128-211656-ae83c97e",
+    "nitro-nightly": "3.0.1-20260128-211656-ae83c97e",
     "zod": "catalog:"
   },
   "devDependencies": {
