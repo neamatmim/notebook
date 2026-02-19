@@ -1,0 +1,5 @@
+{
+  "buildCommand": "NITRO_PRESET=vercel bun run build --filter=web",
+  "installCommand": "bun install",
+  "outputDirectory": "apps/web/.vercel/output"
+}
