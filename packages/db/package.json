@@ -5,6 +5,9 @@
     ".": {
       "default": "./src/index.ts"
     },
+    "./schema": {
+      "default": "./src/schema/index.ts"
+    },
     "./*": {
       "default": "./src/*.ts"
     }
@@ -17,13 +20,15 @@
     "db:start": "docker compose up -d",
     "db:watch": "docker compose up",
     "db:stop": "docker compose stop",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "seed": "bun run src/seed.ts"
   },
   "dependencies": {
     "@notebook/env": "workspace:*",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
     "pg": "^8.17.1",
+    "postgres": "^3.4.8",
     "zod": "catalog:"
   },
   "devDependencies": {

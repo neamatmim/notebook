@@ -11,9 +11,9 @@ export const auth = betterAuth({
 
     schema: schema,
   }),
-  trustedOrigins: [env.CORS_ORIGIN],
   emailAndPassword: {
     enabled: true,
   },
   plugins: [tanstackStartCookies()],
+  trustedOrigins: [env.CORS_ORIGIN],
 });

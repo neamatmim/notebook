@@ -3,5 +3,31 @@
   "extends": [
     "./node_modules/ultracite/config/oxlint/core/.oxlintrc.json",
     "./node_modules/ultracite/config/oxlint/react/.oxlintrc.json"
-  ]
+  ],
+  "ignorePatterns": ["**/routeTree.gen.ts"],
+  "rules": {
+    "func-style": "off",
+    "react_perf/jsx-no-new-function-as-prop": "off",
+    "no-nested-ternary": "off",
+    "unicorn/no-nested-ternary": "off",
+    "no-inline-comments": "off",
+    "sort-keys": "off",
+    "unicorn/no-array-reduce": "off",
+    "import/no-relative-parent-imports": "off",
+    "no-barrel-file": "off",
+    "typescript/no-non-null-assertion": "off",
+    "typescript/no-explicit-any": "off",
+    "require-await": "off",
+    "jest/require-hook": "off",
+    "import/no-named-as-default": "off",
+    "promise/prefer-await-to-then": "off",
+    "promise/prefer-await-to-callbacks": "off",
+    "jsx-a11y/label-has-associated-control": "off",
+    "typescript/no-dynamic-delete": "off",
+    "no-negated-condition": "off",
+    "max-statements": "off",
+    "complexity": "off",
+    "react/no-array-index-key": "off",
+    "react/jsx-pascal-case": "off"
+  }
 }

@@ -6,12 +6,13 @@ export const Route = createFileRoute("/llms.txt")({
   server: {
     handlers: {
       GET: async () => {
-        const lines: string[] = [];
-        lines.push("# Documentation");
-        lines.push("");
-        for (const page of source.getPages()) {
-          lines.push(`- [${page.data.title}](${page.url}): ${page.data.description}`);
-        }
+        const pageLines = source
+          .getPages()
+          .map(
+            (page) =>
+              `- [${page.data.title}](${page.url}): ${page.data.description}`
+          );
+        const lines = ["# Documentation", "", ...pageLines];
         return new Response(lines.join("\n"));
       },
     },

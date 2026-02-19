@@ -1,43 +1,47 @@
 import type { QueryClient } from "@tanstack/react-query";
 
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRouteWithContext,
+} from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import type { orpc } from "@/utils/orpc";
 
+import Header from "@/components/header";
 import { Toaster } from "@/components/ui/sonner";
-
-import Header from "../components/header";
-import appCss from "../index.css?url";
+import appCss from "@/index.css?url";
 export interface RouterAppContext {
   orpc: typeof orpc;
   queryClient: QueryClient;
 }
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
+  component: RootDocument,
+
   head: () => ({
+    links: [
+      {
+        href: appCss,
+        rel: "stylesheet",
+      },
+    ],
     meta: [
       {
-        charSet: "utf-8",
+        charSet: "utf8",
       },
       {
-        name: "viewport",
         content: "width=device-width, initial-scale=1",
+        name: "viewport",
       },
       {
         title: "My App",
       },
     ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-    ],
   }),
-
-  component: RootDocument,
 });
 
 function RootDocument() {

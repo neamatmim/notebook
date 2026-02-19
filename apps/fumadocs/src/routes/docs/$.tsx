@@ -3,7 +3,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { useFumadocsLoader } from "fumadocs-core/source/client";
 import browserCollections from "fumadocs-mdx:collections/browser";
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
-import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layouts/docs/page";
+import {
+  DocsBody,
+  DocsDescription,
+  DocsPage,
+  DocsTitle,
+} from "fumadocs-ui/layouts/docs/page";
 import defaultMdxComponents from "fumadocs-ui/mdx";
 import { Suspense } from "react";
 
@@ -27,12 +32,14 @@ const serverLoader = createServerFn({
   .inputValidator((slugs: string[]) => slugs)
   .handler(async ({ data: slugs }) => {
     const page = source.getPage(slugs);
-    if (!page) throw notFound();
+    if (!page) {
+      throw notFound();
+    }
 
     return {
-      url: page.url,
-      path: page.path,
       pageTree: await source.serializePageTree(source.getPageTree()),
+      path: page.path,
+      url: page.url,
     };
   });
 
@@ -46,7 +53,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
     }: {
       url: string;
       path: string;
-    },
+    }
   ) {
     return (
       <DocsPage toc={toc}>
