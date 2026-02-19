@@ -1,5 +1,0 @@
-{
-  "buildCommand": "bun run build --filter=web",
-  "installCommand": "bun install",
-  "outputDirectory": "apps/web/.vercel/output"
-}

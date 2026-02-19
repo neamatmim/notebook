@@ -5,7 +5,7 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": ["dist/**", ".vercel/output/**"],
+      "outputs": [".output/**"],
       "env": [
         "DATABASE_URL",
         "BETTER_AUTH_SECRET",
@@ -15,15 +15,15 @@
         "NITRO_PRESET"
       ]
     },
-    "lint": {
-      "dependsOn": ["^lint"]
-    },
     "check-types": {
       "dependsOn": ["^check-types"]
     },
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "clean": {
+      "cache": false
     },
     "db:push": {
       "cache": false

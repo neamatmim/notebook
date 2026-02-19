@@ -11,12 +11,7 @@ export default defineConfig({
     tailwindcss(),
     tanstackStart(),
     viteReact(),
-    nitro({
-      preset: "vercel",
-      vercel: {
-        entryFormat: "node",
-      },
-    }),
+    nitro(),
   ],
   server: {
     port: 3001,

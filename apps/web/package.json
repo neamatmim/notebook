@@ -3,9 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "clean": "git clean -xdf .output .turbo .tanstack node_modules",
     "build": "vite build",
     "serve": "vite preview",
-    "dev": "vite dev"
+    "dev": "vite dev",
+    "start": "node .output/server/index.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",
@@ -31,8 +33,7 @@
     "dotenv": "catalog:",
     "lucide-react": "^0.525.0",
     "next-themes": "^0.4.6",
-    "nitro": "npm:nitro-nightly@3.0.1-20260128-211656-ae83c97e",
-    "nitro-nightly": "3.0.1-20260128-211656-ae83c97e",
+    "nitro": "npm:nitro-nightly@latest",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "shadcn": "^3.6.2",

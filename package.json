@@ -22,11 +22,15 @@
   },
   "type": "module",
   "scripts": {
+    "clean": "git clean -xdf node_modules",
+    "clean:workspaces": "turbo run clean",
     "dev": "turbo dev",
     "build": "turbo build",
     "check-types": "turbo check-types",
     "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev",
+    "build:web": "turbo -F web build",
+    "start:web": "turbo -F web start",
     "db:push": "turbo -F @notebook/db db:push",
     "db:studio": "turbo -F @notebook/db db:studio",
     "db:generate": "turbo -F @notebook/db db:generate",
@@ -43,8 +47,7 @@
   "dependencies": {
     "@notebook/env": "workspace:*",
     "dotenv": "catalog:",
-    "nitro": "npm:nitro-nightly@3.0.1-20260128-211656-ae83c97e",
-    "nitro-nightly": "3.0.1-20260128-211656-ae83c97e",
+    "nitro": "npm:nitro-nightly@latest",
     "zod": "catalog:"
   },
   "devDependencies": {
