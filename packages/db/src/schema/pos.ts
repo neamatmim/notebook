@@ -29,6 +29,7 @@ export const paymentMethodEnum = pgEnum("payment_method", [
   "check",
   "gift_card",
   "store_credit",
+  "on_account",
 ]);
 
 export const paymentStatusEnum = pgEnum("payment_status", [
@@ -61,6 +62,12 @@ export const customers = pgTable("customers", {
   country: text("country"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   customerNumber: text("customer_number").notNull().unique(),
+  creditBalance: decimal("credit_balance", { precision: 12, scale: 2 })
+    .default("0")
+    .notNull(),
+  dueBalance: decimal("due_balance", { precision: 12, scale: 2 })
+    .default("0")
+    .notNull(),
   discountRate: decimal("discount_rate", { precision: 5, scale: 4 }),
   email: text("email"),
   firstName: text("first_name"),

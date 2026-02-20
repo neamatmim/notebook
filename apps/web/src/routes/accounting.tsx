@@ -5,35 +5,41 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import {
-  BarChart2,
-  CreditCard,
-  Gift,
-  History,
-  RotateCcw,
-  ShoppingCart,
-  Tag,
-  Users,
+  BarChart3,
+  BookOpen,
+  DollarSign,
+  FileText,
+  LayoutDashboard,
+  Settings,
+  TrendingUp,
 } from "lucide-react";
 
 import { getUser } from "@/functions/get-user";
 
 const navigation = [
-  { href: "/pos", icon: ShoppingCart, name: "Point of Sale" },
-  { href: "/pos/sales", icon: History, name: "Sales History" },
-  { href: "/pos/customers", icon: Users, name: "Customers" },
-  { href: "/pos/returns", icon: RotateCcw, name: "Returns" },
-  { href: "/pos/gift-cards", icon: Gift, name: "Gift Cards" },
-  { href: "/pos/discounts", icon: Tag, name: "Discounts" },
-  { href: "/pos/reports", icon: BarChart2, name: "Reports" },
+  { href: "/accounting", icon: LayoutDashboard, name: "Overview" },
+  {
+    href: "/accounting/chart-of-accounts",
+    icon: BookOpen,
+    name: "Chart of Accounts",
+  },
+  {
+    href: "/accounting/journal-entries",
+    icon: FileText,
+    name: "Journal Entries",
+  },
+  { href: "/accounting/expenses", icon: DollarSign, name: "Expenses" },
+  { href: "/accounting/reports", icon: BarChart3, name: "Reports" },
+  { href: "/accounting/settings", icon: Settings, name: "Settings" },
 ] as const;
 
-function POSLayout() {
+function AccountingLayout() {
   return (
     <div className="flex h-full">
       <div className="bg-card w-64 border-r">
         <div className="flex h-16 items-center border-b px-4">
-          <CreditCard className="h-8 w-8 text-green-600" />
-          <span className="ml-2 text-xl font-semibold">Point of Sale</span>
+          <TrendingUp className="h-8 w-8 text-indigo-600" />
+          <span className="ml-2 text-xl font-semibold">Accounting</span>
         </div>
         <nav className="mt-5 space-y-1 px-2">
           {navigation.map((item) => (
@@ -43,7 +49,7 @@ function POSLayout() {
               activeOptions={{ exact: true }}
               activeProps={{
                 className:
-                  "bg-green-50 text-green-700 dark:bg-green-900/50 dark:text-green-300",
+                  "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300",
               }}
               inactiveProps={{
                 className:
@@ -69,12 +75,12 @@ function POSLayout() {
   );
 }
 
-export const Route = createFileRoute("/pos")({
+export const Route = createFileRoute("/accounting")({
   beforeLoad: async () => {
     const session = await getUser();
     return { session };
   },
-  component: POSLayout,
+  component: AccountingLayout,
   loader: async ({ context }) => {
     if (!context.session) {
       throw redirect({ to: "/login" });

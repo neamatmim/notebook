@@ -21,10 +21,11 @@ import {
   stockMovements,
 } from "@notebook/db/schema";
 import { ORPCError } from "@orpc/server";
-import { and, desc, eq, gte, lte, sql, sum } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql, sum } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure } from "../index";
+import { postSaleJournalEntry } from "./accounting";
 
 async function resolveEmployeeId(
   tx: PgTransaction<any, any, ExtractTablesWithRelations<any>>,
@@ -123,6 +124,23 @@ const paymentSchema = z.object({
   authCode: z.string().optional(),
   cardLast4: z.string().optional(),
   cardType: z.string().optional(),
+  giftCardNumber: z.string().optional(),
+  method: z.enum([
+    "cash",
+    "credit_card",
+    "debit_card",
+    "mobile_payment",
+    "check",
+    "gift_card",
+    "store_credit",
+    "on_account",
+  ]),
+  reference: z.string().optional(),
+  transactionId: z.string().optional(),
+});
+
+const dueCollectionSchema = z.object({
+  amount: z.string(),
   method: z.enum([
     "cash",
     "credit_card",
@@ -132,13 +150,12 @@ const paymentSchema = z.object({
     "gift_card",
     "store_credit",
   ]),
-  reference: z.string().optional(),
-  transactionId: z.string().optional(),
 });
 
 const createSaleSchema = z.object({
   customerId: z.string().uuid().optional(),
   discountAmount: z.string().default("0"),
+  dueCollection: dueCollectionSchema.optional(),
   items: z.array(saleItemSchema).min(1),
   locationId: z.string().uuid(),
   loyaltyPointsUsed: z.number().int().min(0).default(0),
@@ -238,6 +255,98 @@ const dateRangeSchema = z.object({
 export const posRouter = {
   // Customers
   customers: {
+    account: protectedProcedure
+      .input(z.object({ id: z.string().uuid() }))
+      .handler(async ({ input }) => {
+        const [customer] = await db
+          .select()
+          .from(customers)
+          .where(eq(customers.id, input.id))
+          .limit(1);
+
+        if (!customer) {
+          throw new ORPCError("NOT_FOUND", { message: "Customer not found" });
+        }
+
+        // Recent purchases with payment method summary
+        const recentSales = await db
+          .select({
+            amountPaid: sales.amountPaid,
+            changeGiven: sales.changeGiven,
+            discountAmount: sales.discountAmount,
+            id: sales.id,
+            loyaltyPointsEarned: sales.loyaltyPointsEarned,
+            loyaltyPointsUsed: sales.loyaltyPointsUsed,
+            receiptNumber: sales.receiptNumber,
+            saleDate: sales.saleDate,
+            status: sales.status,
+            subtotal: sales.subtotal,
+            taxAmount: sales.taxAmount,
+            totalAmount: sales.totalAmount,
+          })
+          .from(sales)
+          .where(eq(sales.customerId, input.id))
+          .orderBy(desc(sales.saleDate))
+          .limit(50);
+
+        const saleIds = recentSales.map((s) => s.id);
+
+        // All payments for those sales
+        const allPayments =
+          saleIds.length > 0
+            ? await db
+                .select({
+                  amount: payments.amount,
+                  authCode: payments.authCode,
+                  cardLast4: payments.cardLast4,
+                  cardType: payments.cardType,
+                  id: payments.id,
+                  method: payments.method,
+                  processedAt: payments.processedAt,
+                  receiptNumber: sales.receiptNumber,
+                  reference: payments.reference,
+                  saleId: payments.saleId,
+                  status: payments.status,
+                })
+                .from(payments)
+                .leftJoin(sales, eq(payments.saleId, sales.id))
+                .where(
+                  and(
+                    inArray(payments.saleId, saleIds),
+                    eq(payments.status, "completed")
+                  )
+                )
+                .orderBy(desc(payments.processedAt))
+            : [];
+
+        // Payment method totals
+        const paymentMethodTotals = allPayments.reduce<Record<string, number>>(
+          (acc, p) => {
+            acc[p.method] = (acc[p.method] ?? 0) + Number(p.amount);
+            return acc;
+          },
+          {}
+        );
+
+        return {
+          allPayments,
+          customer,
+          paymentMethodTotals,
+          recentSales,
+          summary: {
+            averageOrderValue:
+              recentSales.length > 0
+                ? Number(customer.totalSpent) / recentSales.length
+                : 0,
+            creditBalance: Number(customer.creditBalance),
+            dueBalance: Number(customer.dueBalance),
+            loyaltyPoints: customer.loyaltyPoints ?? 0,
+            totalOrders: recentSales.length,
+            totalSpent: Number(customer.totalSpent),
+          },
+        };
+      }),
+
     create: protectedProcedure
       .input(createCustomerSchema)
       .handler(async ({ input }) => {
@@ -271,6 +380,79 @@ export const posRouter = {
         return { success: true };
       }),
 
+    adjustCredit: protectedProcedure
+      .input(
+        z.object({
+          amount: z.string(),
+          id: z.string().uuid(),
+        })
+      )
+      .handler(async ({ input }) => {
+        const [updated] = await db
+          .update(customers)
+          .set({
+            creditBalance: sql`${customers.creditBalance} + ${Number(input.amount)}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(customers.id, input.id))
+          .returning({
+            creditBalance: customers.creditBalance,
+            id: customers.id,
+          });
+        return updated;
+      }),
+
+    collectDuePayment: protectedProcedure
+      .input(
+        z.object({
+          amount: z.string(),
+          customerId: z.string().uuid(),
+          method: z.enum([
+            "cash",
+            "credit_card",
+            "debit_card",
+            "mobile_payment",
+            "check",
+            "gift_card",
+            "store_credit",
+          ]),
+        })
+      )
+      .handler(async ({ input }) => {
+        const amt = Number(input.amount);
+        if (amt <= 0) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Amount must be greater than zero.",
+          });
+        }
+
+        const [cust] = await db
+          .select({ dueBalance: customers.dueBalance, id: customers.id })
+          .from(customers)
+          .where(eq(customers.id, input.customerId))
+          .limit(1);
+
+        if (!cust) {
+          throw new ORPCError("NOT_FOUND", { message: "Customer not found." });
+        }
+        if (Number(cust.dueBalance) < amt) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: `Customer only owes $${Number(cust.dueBalance).toFixed(2)}.`,
+          });
+        }
+
+        const [updated] = await db
+          .update(customers)
+          .set({
+            dueBalance: sql`${customers.dueBalance} - ${amt}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(customers.id, input.customerId))
+          .returning({ dueBalance: customers.dueBalance, id: customers.id });
+
+        return updated;
+      }),
+
     get: protectedProcedure
       .input(z.object({ id: z.string().uuid() }))
       .handler(async ({ input }) => {
@@ -300,7 +482,9 @@ export const posRouter = {
           .select({
             companyName: customers.companyName,
             createdAt: customers.createdAt,
+            creditBalance: customers.creditBalance,
             customerNumber: customers.customerNumber,
+            dueBalance: customers.dueBalance,
             email: customers.email,
             firstName: customers.firstName,
             id: customers.id,
@@ -483,9 +667,10 @@ export const posRouter = {
 
   // Sales
   sales: {
-    create: protectedProcedure.input(createSaleSchema).handler(
-      async ({ input, context }) =>
-        await db.transaction(async (tx) => {
+    create: protectedProcedure
+      .input(createSaleSchema)
+      .handler(async ({ input, context }) => {
+        const txResult = await db.transaction(async (tx) => {
           const employeeId = await resolveEmployeeId(tx, context.session.user);
           const receiptNumber = `REC-${Date.now()}`;
 
@@ -518,7 +703,7 @@ export const posRouter = {
               discountAmount: input.discountAmount,
               employeeId,
               locationId: input.locationId,
-              loyaltyPointsEarned: Math.floor(totalAmount * 0.01),
+              loyaltyPointsEarned: Math.floor(totalAmount),
               loyaltyPointsUsed: input.loyaltyPointsUsed,
               notes: input.notes,
               receiptNumber,
@@ -603,13 +788,142 @@ export const posRouter = {
               status: "completed",
               transactionId: payment.transactionId,
             });
+
+            // Validate and redeem the gift card balance
+            if (payment.method === "gift_card" && payment.giftCardNumber) {
+              const [gc] = await tx
+                .select()
+                .from(giftCards)
+                .where(
+                  and(
+                    eq(giftCards.cardNumber, payment.giftCardNumber),
+                    eq(giftCards.isActive, true)
+                  )
+                )
+                .limit(1);
+
+              if (!gc) {
+                throw new ORPCError("BAD_REQUEST", {
+                  message: `Gift card ${payment.giftCardNumber} not found or inactive.`,
+                });
+              }
+              if (gc.expiresAt && new Date() > gc.expiresAt) {
+                throw new ORPCError("BAD_REQUEST", {
+                  message: `Gift card ${payment.giftCardNumber} has expired.`,
+                });
+              }
+              if (Number(gc.currentBalance) < Number(payment.amount)) {
+                throw new ORPCError("BAD_REQUEST", {
+                  message: `Gift card ${payment.giftCardNumber} has insufficient balance ($${Number(gc.currentBalance).toFixed(2)} available).`,
+                });
+              }
+
+              const gcNewBalance = (
+                Number(gc.currentBalance) - Number(payment.amount)
+              ).toString();
+
+              await tx
+                .update(giftCards)
+                .set({ currentBalance: gcNewBalance, updatedAt: new Date() })
+                .where(eq(giftCards.id, gc.id));
+
+              await tx.insert(giftCardTransactions).values({
+                amount: payment.amount,
+                balanceAfter: gcNewBalance,
+                balanceBefore: gc.currentBalance,
+                employeeId,
+                giftCardId: gc.id,
+                saleId: sale.id,
+                type: "redemption",
+              });
+            }
+          }
+
+          const storeCreditPayment = input.payments.find(
+            (p) => p.method === "store_credit"
+          );
+          if (storeCreditPayment) {
+            if (!input.customerId) {
+              throw new ORPCError("BAD_REQUEST", {
+                message: "A customer must be selected to use store credit.",
+              });
+            }
+            const [cust] = await tx
+              .select({ creditBalance: customers.creditBalance })
+              .from(customers)
+              .where(eq(customers.id, input.customerId));
+
+            const creditUsed = Number(storeCreditPayment.amount);
+            if (!cust || Number(cust.creditBalance) < creditUsed) {
+              throw new ORPCError("BAD_REQUEST", {
+                message: "Insufficient store credit balance.",
+              });
+            }
+            await tx
+              .update(customers)
+              .set({
+                creditBalance: sql`${customers.creditBalance} - ${creditUsed}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(customers.id, input.customerId));
+          }
+
+          // on_account: add unpaid amount to customer's dueBalance
+          const onAccountPayments = input.payments.filter(
+            (p) => p.method === "on_account"
+          );
+          if (onAccountPayments.length > 0) {
+            if (!input.customerId) {
+              throw new ORPCError("BAD_REQUEST", {
+                message:
+                  "A customer must be selected to use On Account payment.",
+              });
+            }
+            const onAccountTotal = onAccountPayments.reduce(
+              (s, p) => s + Number(p.amount),
+              0
+            );
+            await tx
+              .update(customers)
+              .set({
+                dueBalance: sql`${customers.dueBalance} + ${onAccountTotal}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(customers.id, input.customerId));
+          }
+
+          // dueCollection: reduce existing dueBalance (collecting outstanding debt)
+          if (input.dueCollection) {
+            if (!input.customerId) {
+              throw new ORPCError("BAD_REQUEST", {
+                message: "A customer must be selected to collect due.",
+              });
+            }
+            const collectAmt = Number(input.dueCollection.amount);
+            const [cust] = await tx
+              .select({ dueBalance: customers.dueBalance })
+              .from(customers)
+              .where(eq(customers.id, input.customerId))
+              .limit(1);
+            if (!cust || Number(cust.dueBalance) < collectAmt) {
+              throw new ORPCError("BAD_REQUEST", {
+                message: "Collection amount exceeds outstanding balance.",
+              });
+            }
+            await tx
+              .update(customers)
+              .set({
+                dueBalance: sql`${customers.dueBalance} - ${collectAmt}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(customers.id, input.customerId));
           }
 
           if (input.customerId) {
             await tx
               .update(customers)
               .set({
-                loyaltyPoints: sql`${customers.loyaltyPoints} + ${Math.floor(totalAmount * 0.01)} - ${input.loyaltyPointsUsed}`,
+                loyaltyPoints: sql`${customers.loyaltyPoints} + ${Math.floor(totalAmount)} - ${input.loyaltyPointsUsed}`,
                 totalSpent: sql`${customers.totalSpent} + ${totalAmount}`,
                 updatedAt: new Date(),
               })
@@ -627,9 +941,39 @@ export const posRouter = {
               .where(eq(shifts.id, input.shiftId));
           }
 
-          return sale;
-        })
-    ),
+          return {
+            discountAmount: input.discountAmount,
+            payments: input.payments,
+            sale,
+            subtotal: subtotal.toString(),
+            taxAmount: taxAmount.toString(),
+          };
+        });
+
+        // Auto-post accounting journal entry outside the main transaction so that
+        // a failure here (e.g. accounts not seeded) never rolls back the sale.
+        try {
+          await postSaleJournalEntry(
+            db,
+            {
+              discountAmount: txResult.discountAmount,
+              id: txResult.sale!.id,
+              saleDate: txResult.sale!.saleDate,
+              subtotal: txResult.subtotal,
+              taxAmount: txResult.taxAmount,
+            },
+            txResult.payments.map((p) => ({
+              amount: p.amount,
+              method: p.method,
+            })),
+            context.session.user.id
+          );
+        } catch {
+          // Accounting not configured — sale still succeeded
+        }
+
+        return txResult.sale;
+      }),
 
     get: protectedProcedure
       .input(z.object({ id: z.string().uuid() }))
@@ -1127,6 +1471,45 @@ export const posRouter = {
 
   // Gift Cards
   giftCards: {
+    list: protectedProcedure
+      .input(paginationSchema)
+      .handler(async ({ input }) => {
+        const [items, totalCountResult] = await Promise.all([
+          db
+            .select({
+              cardNumber: giftCards.cardNumber,
+              createdAt: giftCards.createdAt,
+              currentBalance: giftCards.currentBalance,
+              customer: {
+                firstName: customers.firstName,
+                id: customers.id,
+                lastName: customers.lastName,
+              },
+              expiresAt: giftCards.expiresAt,
+              id: giftCards.id,
+              initialAmount: giftCards.initialAmount,
+              isActive: giftCards.isActive,
+              notes: giftCards.notes,
+              purchasedAt: giftCards.purchasedAt,
+            })
+            .from(giftCards)
+            .leftJoin(customers, eq(giftCards.customerId, customers.id))
+            .limit(input.limit)
+            .offset(input.offset)
+            .orderBy(desc(giftCards.createdAt)),
+          db.select({ count: sql<number>`count(*)` }).from(giftCards),
+        ]);
+
+        return {
+          items,
+          pagination: {
+            limit: input.limit,
+            offset: input.offset,
+            total: totalCountResult[0]?.count ?? 0,
+          },
+        };
+      }),
+
     balance: protectedProcedure
       .input(z.object({ cardNumber: z.string() }))
       .handler(async ({ input }) => {
@@ -1313,6 +1696,61 @@ export const posRouter = {
           .limit(input.limit);
 
         return topProducts;
+      }),
+
+    salesByDay: protectedProcedure
+      .input(
+        dateRangeSchema.extend({ locationId: z.string().uuid().optional() })
+      )
+      .handler(async ({ input }) => {
+        const conditions = [
+          eq(sales.status, "completed"),
+          gte(sales.saleDate, new Date(input.from)),
+          lte(sales.saleDate, new Date(input.to)),
+        ];
+
+        if (input.locationId) {
+          conditions.push(eq(sales.locationId, input.locationId));
+        }
+
+        return db
+          .select({
+            date: sql<string>`DATE(${sales.saleDate})`,
+            totalSales: sum(sales.totalAmount),
+            totalTransactions: sql<number>`count(*)`,
+          })
+          .from(sales)
+          .where(and(...conditions))
+          .groupBy(sql`DATE(${sales.saleDate})`)
+          .orderBy(sql`DATE(${sales.saleDate})`);
+      }),
+
+    salesByPaymentMethod: protectedProcedure
+      .input(
+        dateRangeSchema.extend({ locationId: z.string().uuid().optional() })
+      )
+      .handler(async ({ input }) => {
+        const conditions = [
+          eq(sales.status, "completed"),
+          gte(sales.saleDate, new Date(input.from)),
+          lte(sales.saleDate, new Date(input.to)),
+        ];
+
+        if (input.locationId) {
+          conditions.push(eq(sales.locationId, input.locationId));
+        }
+
+        return db
+          .select({
+            method: payments.method,
+            totalAmount: sum(payments.amount),
+            transactionCount: sql<number>`count(*)`,
+          })
+          .from(payments)
+          .innerJoin(sales, eq(payments.saleId, sales.id))
+          .where(and(...conditions))
+          .groupBy(payments.method)
+          .orderBy(desc(sum(payments.amount)));
       }),
   },
 };

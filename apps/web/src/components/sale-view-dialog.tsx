@@ -1,15 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Printer } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { orpc } from "@/utils/orpc";
+import { printReceipt } from "@/utils/print-receipt";
 
 interface SaleViewDialogProps {
   onClose: () => void;
@@ -25,6 +28,45 @@ export function SaleViewDialog({ saleId, onClose }: SaleViewDialogProps) {
   );
 
   const s = saleQuery.data;
+
+  const handlePrint = () => {
+    if (!s) {
+      return;
+    }
+    printReceipt({
+      receiptNumber: s.receiptNumber,
+      saleDate: s.saleDate ?? new Date(),
+      locationName: s.location?.name,
+      employeeName: s.employee?.firstName
+        ? `${s.employee.firstName} ${s.employee.lastName ?? ""}`.trim()
+        : undefined,
+      customerName: s.customer?.firstName
+        ? `${s.customer.firstName} ${s.customer.lastName ?? ""}`.trim()
+        : undefined,
+      customerEmail: s.customer?.email,
+      customerPhone: s.customer?.phone,
+      items: s.items.map((item) => ({
+        name: item.product?.name ?? "Unknown",
+        sku: item.product?.sku ?? "",
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+        totalPrice: Number(item.totalPrice),
+      })),
+      payments: s.payments.map((p) => ({
+        method: p.method,
+        amount: Number(p.amount),
+        cardLast4: p.cardLast4,
+        cardType: p.cardType,
+      })),
+      subtotal: Number(s.subtotal),
+      discountAmount: Number(s.discountAmount),
+      taxAmount: Number(s.taxAmount),
+      totalAmount: Number(s.totalAmount),
+      amountPaid: s.payments.reduce((sum, p) => sum + Number(p.amount), 0),
+      changeGiven: Number(s.changeGiven ?? 0),
+      notes: s.notes,
+    });
+  };
 
   return (
     <Dialog
@@ -151,6 +193,15 @@ export function SaleViewDialog({ saleId, onClose }: SaleViewDialogProps) {
             </div>
           </div>
         ) : null}
+
+        {s && (
+          <DialogFooter>
+            <Button variant="outline" onClick={handlePrint}>
+              <Printer className="mr-2 h-4 w-4" />
+              Print Receipt
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

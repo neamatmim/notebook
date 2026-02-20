@@ -1,11 +1,13 @@
 import type { RouterClient } from "@orpc/server";
 
 import { protectedProcedure, publicProcedure } from "../index";
+import { accountingRouter } from "./accounting";
 import { inventoryRouter } from "./inventory";
 import { posRouter } from "./pos";
 import { todoRouter } from "./todo";
 
 export const appRouter = {
+  accounting: accountingRouter,
   healthCheck: publicProcedure.handler(() => "OK"),
   inventory: inventoryRouter,
   pos: posRouter,

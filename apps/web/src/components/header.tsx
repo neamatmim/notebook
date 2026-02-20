@@ -8,6 +8,7 @@ export default function Header() {
     { label: "Dashboard", to: "/dashboard" },
     { label: "Inventory", to: "/inventory" },
     { label: "POS", to: "/pos" },
+    { label: "Accounting", to: "/accounting" },
     { label: "Todos", to: "/todos" },
   ] as const;
 

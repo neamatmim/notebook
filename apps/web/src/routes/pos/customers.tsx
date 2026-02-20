@@ -2,16 +2,45 @@ import type { ColumnDef } from "@tanstack/react-table";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  Banknote,
+  CreditCard,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  User,
+} from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CustomerAccountDialog } from "@/components/customer-account-dialog";
 import { CustomerFormDialog } from "@/components/customer-form-dialog";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { queryClient, orpc } from "@/utils/orpc";
 
 const PAGE_SIZE = 20;
+
+type CollectDueMethod =
+  | "cash"
+  | "credit_card"
+  | "debit_card"
+  | "mobile_payment"
+  | "check"
+  | "gift_card"
+  | "store_credit";
 
 function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -19,6 +48,13 @@ function CustomersPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [creditId, setCreditId] = useState<string | null>(null);
+  const [creditAmount, setCreditAmount] = useState("");
+  const [collectDueId, setCollectDueId] = useState<string | null>(null);
+  const [collectDueAmount, setCollectDueAmount] = useState("");
+  const [collectDueMethod, setCollectDueMethod] =
+    useState<CollectDueMethod>("cash");
+  const [accountId, setAccountId] = useState<string | null>(null);
 
   const customersQuery = useQuery(
     orpc.pos.customers.list.queryOptions({
@@ -43,9 +79,42 @@ function CustomersPage() {
     })
   );
 
+  const adjustCreditMutation = useMutation(
+    orpc.pos.customers.adjustCredit.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey: orpc.pos.customers.list
+            .queryOptions({ input: {} })
+            .queryKey.slice(0, 2),
+        });
+        setCreditId(null);
+        setCreditAmount("");
+      },
+    })
+  );
+
+  const collectDueMutation = useMutation(
+    orpc.pos.customers.collectDuePayment.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey: orpc.pos.customers.list
+            .queryOptions({ input: {} })
+            .queryKey.slice(0, 2),
+        });
+        setCollectDueId(null);
+        setCollectDueAmount("");
+        setCollectDueMethod("cash");
+        toast.success("Payment collected.");
+      },
+      onError: (e) => toast.error(e.message ?? "Failed to collect payment."),
+    })
+  );
+
   const items = customersQuery.data?.items ?? [];
   const total = customersQuery.data?.pagination.total ?? 0;
   const pageCount = Math.ceil(total / PAGE_SIZE);
+
+  const collectDueCustomer = items.find((c) => c.id === collectDueId);
 
   const columns: ColumnDef<(typeof items)[number]>[] = [
     {
@@ -99,8 +168,35 @@ function CustomersPage() {
       header: "Loyalty Points",
     },
     {
+      accessorKey: "creditBalance",
+      cell: ({ row }) =>
+        `$${Number(row.original.creditBalance ?? 0).toFixed(2)}`,
+      header: "Store Credit",
+    },
+    {
+      accessorKey: "dueBalance",
+      cell: ({ row }) => {
+        const due = Number(row.original.dueBalance ?? 0);
+        return (
+          <span className={due > 0 ? "font-semibold text-red-600" : ""}>
+            ${due.toFixed(2)}
+          </span>
+        );
+      },
+      header: "Due Balance",
+    },
+    {
       cell: ({ row }) => (
         <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-green-600 hover:text-green-700"
+            title="View Account"
+            onClick={() => setAccountId(row.original.id)}
+          >
+            <User className="h-4 w-4" />
+          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -110,6 +206,28 @@ function CustomersPage() {
             }}
           >
             <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-green-600 hover:text-green-700"
+            title="Adjust Store Credit"
+            onClick={() => setCreditId(row.original.id)}
+          >
+            <CreditCard className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-orange-600 hover:text-orange-700"
+            title="Collect Due Payment"
+            disabled={Number(row.original.dueBalance ?? 0) <= 0}
+            onClick={() => {
+              setCollectDueId(row.original.id);
+              setCollectDueAmount(Number(row.original.dueBalance).toFixed(2));
+            }}
+          >
+            <Banknote className="h-4 w-4" />
           </Button>
           <Button
             size="sm"
@@ -164,6 +282,11 @@ function CustomersPage() {
         loading={customersQuery.isLoading}
       />
 
+      <CustomerAccountDialog
+        customerId={accountId}
+        onClose={() => setAccountId(null)}
+      />
+
       <CustomerFormDialog
         open={formOpen}
         onClose={() => {
@@ -187,6 +310,152 @@ function CustomersPage() {
         variant="danger"
         loading={deleteMutation.isPending}
       />
+
+      <Dialog
+        open={Boolean(creditId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreditId(null);
+            setCreditAmount("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Adjust Store Credit</DialogTitle>
+            <DialogDescription>
+              Enter a positive amount to add credit, negative to deduct.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="credit-amount">Amount ($)</Label>
+            <Input
+              id="credit-amount"
+              type="number"
+              step="0.01"
+              value={creditAmount}
+              onChange={(e) => setCreditAmount(e.target.value)}
+              placeholder="e.g. 50.00 or -10.00"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreditId(null);
+                setCreditAmount("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={!creditAmount || adjustCreditMutation.isPending}
+              onClick={() => {
+                if (creditId && creditAmount) {
+                  adjustCreditMutation.mutate({
+                    amount: creditAmount,
+                    id: creditId,
+                  });
+                }
+              }}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {adjustCreditMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(collectDueId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCollectDueId(null);
+            setCollectDueAmount("");
+            setCollectDueMethod("cash");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Collect Due Payment</DialogTitle>
+            <DialogDescription>
+              Outstanding balance: $
+              {Number(collectDueCustomer?.dueBalance ?? 0).toFixed(2)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="collect-due-amount">Amount ($)</Label>
+              <Input
+                id="collect-due-amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={Number(collectDueCustomer?.dueBalance ?? 0)}
+                value={collectDueAmount}
+                onChange={(e) => setCollectDueAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="collect-due-method">Payment Method</Label>
+              <select
+                id="collect-due-method"
+                value={collectDueMethod}
+                onChange={(e) =>
+                  setCollectDueMethod(e.target.value as CollectDueMethod)
+                }
+                className="border-input bg-background flex h-8 w-full rounded-none border px-2.5 py-1 text-xs outline-none"
+              >
+                <option value="cash">Cash</option>
+                <option value="credit_card">Credit Card</option>
+                <option value="debit_card">Debit Card</option>
+                <option value="mobile_payment">Mobile Payment</option>
+                <option value="check">Check</option>
+                <option value="gift_card">Gift Card</option>
+                <option value="store_credit">Store Credit</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCollectDueId(null);
+                setCollectDueAmount("");
+                setCollectDueMethod("cash");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                !collectDueAmount ||
+                Number(collectDueAmount) <= 0 ||
+                collectDueMutation.isPending
+              }
+              onClick={() => {
+                if (collectDueId && collectDueAmount) {
+                  collectDueMutation.mutate({
+                    amount: collectDueAmount,
+                    customerId: collectDueId,
+                    method: collectDueMethod,
+                  });
+                }
+              }}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {collectDueMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Collect Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

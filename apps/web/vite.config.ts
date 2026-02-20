@@ -15,5 +15,11 @@ export default defineConfig({
   ],
   server: {
     port: 3001,
+    watch: {
+      // Workspace packages are symlinked into node_modules/@notebook.
+      // Vite ignores node_modules by default, so changes to packages/api etc.
+      // never trigger a server reload. Explicitly un-ignore them here.
+      ignored: ["**/node_modules/**", "!**/node_modules/@notebook/**"],
+    },
   },
 });
