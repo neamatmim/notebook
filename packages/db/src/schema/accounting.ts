@@ -139,6 +139,8 @@ export const journalEntries = pgTable("journal_entries", {
     .default("0")
     .notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  voidedAt: timestamp("voided_at"),
+  voidReason: text("void_reason"),
 });
 
 export const journalEntriesRelations = relations(

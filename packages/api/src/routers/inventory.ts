@@ -595,7 +595,7 @@ export const inventoryRouter = {
                 quantity: newQuantity,
                 updatedAt: new Date(),
               })
-              .where(eq(stockLevels.id, stockLevel[0].id));
+              .where(eq(stockLevels.id, stockLevel[0]!.id));
           } else {
             await tx.insert(stockLevels).values({
               availableQuantity: newQuantity,
@@ -728,7 +728,7 @@ export const inventoryRouter = {
             const totalCost = Number(item.unitCost) * item.quantity;
             await tx.insert(purchaseOrderItems).values({
               productId: item.productId,
-              purchaseOrderId: order.id,
+              purchaseOrderId: order!.id,
               quantity: item.quantity,
               totalCost: totalCost.toString(),
               unitCost: item.unitCost,
@@ -863,7 +863,7 @@ export const inventoryRouter = {
                 .update(purchaseOrderItems)
                 .set({
                   receivedQuantity:
-                    orderItem.receivedQuantity + item.receivedQuantity,
+                    (orderItem.receivedQuantity ?? 0) + item.receivedQuantity,
                   updatedAt: new Date(),
                 })
                 .where(eq(purchaseOrderItems.id, item.itemId));
@@ -894,7 +894,7 @@ export const inventoryRouter = {
                       quantity: newQuantity,
                       updatedAt: new Date(),
                     })
-                    .where(eq(stockLevels.id, stockLevel[0].id));
+                    .where(eq(stockLevels.id, stockLevel[0]!.id));
                 } else {
                   await tx.insert(stockLevels).values({
                     availableQuantity: newQuantity,

@@ -9,14 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TodosRouteImport } from './routes/todos'
 import { Route as PosRouteImport } from './routes/pos'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as InvestmentRouteImport } from './routes/investment'
 import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AccountingRouteImport } from './routes/accounting'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PosIndexRouteImport } from './routes/pos/index'
+import { Route as InvestmentIndexRouteImport } from './routes/investment/index'
 import { Route as InventoryIndexRouteImport } from './routes/inventory/index'
 import { Route as AccountingIndexRouteImport } from './routes/accounting/index'
 import { Route as PosSalesRouteImport } from './routes/pos/sales'
@@ -25,6 +26,15 @@ import { Route as PosReportsRouteImport } from './routes/pos/reports'
 import { Route as PosGiftCardsRouteImport } from './routes/pos/gift-cards'
 import { Route as PosDiscountsRouteImport } from './routes/pos/discounts'
 import { Route as PosCustomersRouteImport } from './routes/pos/customers'
+import { Route as InvestmentShareholdersRouteImport } from './routes/investment/shareholders'
+import { Route as InvestmentShareClassesRouteImport } from './routes/investment/share-classes'
+import { Route as InvestmentReportsRouteImport } from './routes/investment/reports'
+import { Route as InvestmentProjectsRouteImport } from './routes/investment/projects'
+import { Route as InvestmentPaymentsRouteImport } from './routes/investment/payments'
+import { Route as InvestmentMilestonesRouteImport } from './routes/investment/milestones'
+import { Route as InvestmentInvestorsRouteImport } from './routes/investment/investors'
+import { Route as InvestmentDistributionsRouteImport } from './routes/investment/distributions'
+import { Route as InvestmentCapitalCallsRouteImport } from './routes/investment/capital-calls'
 import { Route as InventorySuppliersRouteImport } from './routes/inventory/suppliers'
 import { Route as InventoryStockMovementsRouteImport } from './routes/inventory/stock-movements'
 import { Route as InventoryPurchaseOrdersRouteImport } from './routes/inventory/purchase-orders'
@@ -39,11 +49,6 @@ import { Route as AccountingChartOfAccountsRouteImport } from './routes/accounti
 import { Route as ApiRpcSplatRouteImport } from './routes/api/rpc/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
-const TodosRoute = TodosRouteImport.update({
-  id: '/todos',
-  path: '/todos',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PosRoute = PosRouteImport.update({
   id: '/pos',
   path: '/pos',
@@ -52,6 +57,11 @@ const PosRoute = PosRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvestmentRoute = InvestmentRouteImport.update({
+  id: '/investment',
+  path: '/investment',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InventoryRoute = InventoryRouteImport.update({
@@ -78,6 +88,11 @@ const PosIndexRoute = PosIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => PosRoute,
+} as any)
+const InvestmentIndexRoute = InvestmentIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => InvestmentRoute,
 } as any)
 const InventoryIndexRoute = InventoryIndexRouteImport.update({
   id: '/',
@@ -118,6 +133,51 @@ const PosCustomersRoute = PosCustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
   getParentRoute: () => PosRoute,
+} as any)
+const InvestmentShareholdersRoute = InvestmentShareholdersRouteImport.update({
+  id: '/shareholders',
+  path: '/shareholders',
+  getParentRoute: () => InvestmentRoute,
+} as any)
+const InvestmentShareClassesRoute = InvestmentShareClassesRouteImport.update({
+  id: '/share-classes',
+  path: '/share-classes',
+  getParentRoute: () => InvestmentRoute,
+} as any)
+const InvestmentReportsRoute = InvestmentReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => InvestmentRoute,
+} as any)
+const InvestmentProjectsRoute = InvestmentProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => InvestmentRoute,
+} as any)
+const InvestmentPaymentsRoute = InvestmentPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => InvestmentRoute,
+} as any)
+const InvestmentMilestonesRoute = InvestmentMilestonesRouteImport.update({
+  id: '/milestones',
+  path: '/milestones',
+  getParentRoute: () => InvestmentRoute,
+} as any)
+const InvestmentInvestorsRoute = InvestmentInvestorsRouteImport.update({
+  id: '/investors',
+  path: '/investors',
+  getParentRoute: () => InvestmentRoute,
+} as any)
+const InvestmentDistributionsRoute = InvestmentDistributionsRouteImport.update({
+  id: '/distributions',
+  path: '/distributions',
+  getParentRoute: () => InvestmentRoute,
+} as any)
+const InvestmentCapitalCallsRoute = InvestmentCapitalCallsRouteImport.update({
+  id: '/capital-calls',
+  path: '/capital-calls',
+  getParentRoute: () => InvestmentRoute,
 } as any)
 const InventorySuppliersRoute = InventorySuppliersRouteImport.update({
   id: '/suppliers',
@@ -192,9 +252,9 @@ export interface FileRoutesByFullPath {
   '/accounting': typeof AccountingRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/inventory': typeof InventoryRouteWithChildren
+  '/investment': typeof InvestmentRouteWithChildren
   '/login': typeof LoginRoute
   '/pos': typeof PosRouteWithChildren
-  '/todos': typeof TodosRoute
   '/accounting/chart-of-accounts': typeof AccountingChartOfAccountsRoute
   '/accounting/expenses': typeof AccountingExpensesRoute
   '/accounting/journal-entries': typeof AccountingJournalEntriesRoute
@@ -206,6 +266,15 @@ export interface FileRoutesByFullPath {
   '/inventory/purchase-orders': typeof InventoryPurchaseOrdersRoute
   '/inventory/stock-movements': typeof InventoryStockMovementsRoute
   '/inventory/suppliers': typeof InventorySuppliersRoute
+  '/investment/capital-calls': typeof InvestmentCapitalCallsRoute
+  '/investment/distributions': typeof InvestmentDistributionsRoute
+  '/investment/investors': typeof InvestmentInvestorsRoute
+  '/investment/milestones': typeof InvestmentMilestonesRoute
+  '/investment/payments': typeof InvestmentPaymentsRoute
+  '/investment/projects': typeof InvestmentProjectsRoute
+  '/investment/reports': typeof InvestmentReportsRoute
+  '/investment/share-classes': typeof InvestmentShareClassesRoute
+  '/investment/shareholders': typeof InvestmentShareholdersRoute
   '/pos/customers': typeof PosCustomersRoute
   '/pos/discounts': typeof PosDiscountsRoute
   '/pos/gift-cards': typeof PosGiftCardsRoute
@@ -214,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/pos/sales': typeof PosSalesRoute
   '/accounting/': typeof AccountingIndexRoute
   '/inventory/': typeof InventoryIndexRoute
+  '/investment/': typeof InvestmentIndexRoute
   '/pos/': typeof PosIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
@@ -222,7 +292,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
-  '/todos': typeof TodosRoute
   '/accounting/chart-of-accounts': typeof AccountingChartOfAccountsRoute
   '/accounting/expenses': typeof AccountingExpensesRoute
   '/accounting/journal-entries': typeof AccountingJournalEntriesRoute
@@ -234,6 +303,15 @@ export interface FileRoutesByTo {
   '/inventory/purchase-orders': typeof InventoryPurchaseOrdersRoute
   '/inventory/stock-movements': typeof InventoryStockMovementsRoute
   '/inventory/suppliers': typeof InventorySuppliersRoute
+  '/investment/capital-calls': typeof InvestmentCapitalCallsRoute
+  '/investment/distributions': typeof InvestmentDistributionsRoute
+  '/investment/investors': typeof InvestmentInvestorsRoute
+  '/investment/milestones': typeof InvestmentMilestonesRoute
+  '/investment/payments': typeof InvestmentPaymentsRoute
+  '/investment/projects': typeof InvestmentProjectsRoute
+  '/investment/reports': typeof InvestmentReportsRoute
+  '/investment/share-classes': typeof InvestmentShareClassesRoute
+  '/investment/shareholders': typeof InvestmentShareholdersRoute
   '/pos/customers': typeof PosCustomersRoute
   '/pos/discounts': typeof PosDiscountsRoute
   '/pos/gift-cards': typeof PosGiftCardsRoute
@@ -242,6 +320,7 @@ export interface FileRoutesByTo {
   '/pos/sales': typeof PosSalesRoute
   '/accounting': typeof AccountingIndexRoute
   '/inventory': typeof InventoryIndexRoute
+  '/investment': typeof InvestmentIndexRoute
   '/pos': typeof PosIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
@@ -252,9 +331,9 @@ export interface FileRoutesById {
   '/accounting': typeof AccountingRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/inventory': typeof InventoryRouteWithChildren
+  '/investment': typeof InvestmentRouteWithChildren
   '/login': typeof LoginRoute
   '/pos': typeof PosRouteWithChildren
-  '/todos': typeof TodosRoute
   '/accounting/chart-of-accounts': typeof AccountingChartOfAccountsRoute
   '/accounting/expenses': typeof AccountingExpensesRoute
   '/accounting/journal-entries': typeof AccountingJournalEntriesRoute
@@ -266,6 +345,15 @@ export interface FileRoutesById {
   '/inventory/purchase-orders': typeof InventoryPurchaseOrdersRoute
   '/inventory/stock-movements': typeof InventoryStockMovementsRoute
   '/inventory/suppliers': typeof InventorySuppliersRoute
+  '/investment/capital-calls': typeof InvestmentCapitalCallsRoute
+  '/investment/distributions': typeof InvestmentDistributionsRoute
+  '/investment/investors': typeof InvestmentInvestorsRoute
+  '/investment/milestones': typeof InvestmentMilestonesRoute
+  '/investment/payments': typeof InvestmentPaymentsRoute
+  '/investment/projects': typeof InvestmentProjectsRoute
+  '/investment/reports': typeof InvestmentReportsRoute
+  '/investment/share-classes': typeof InvestmentShareClassesRoute
+  '/investment/shareholders': typeof InvestmentShareholdersRoute
   '/pos/customers': typeof PosCustomersRoute
   '/pos/discounts': typeof PosDiscountsRoute
   '/pos/gift-cards': typeof PosGiftCardsRoute
@@ -274,6 +362,7 @@ export interface FileRoutesById {
   '/pos/sales': typeof PosSalesRoute
   '/accounting/': typeof AccountingIndexRoute
   '/inventory/': typeof InventoryIndexRoute
+  '/investment/': typeof InvestmentIndexRoute
   '/pos/': typeof PosIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
@@ -285,9 +374,9 @@ export interface FileRouteTypes {
     | '/accounting'
     | '/dashboard'
     | '/inventory'
+    | '/investment'
     | '/login'
     | '/pos'
-    | '/todos'
     | '/accounting/chart-of-accounts'
     | '/accounting/expenses'
     | '/accounting/journal-entries'
@@ -299,6 +388,15 @@ export interface FileRouteTypes {
     | '/inventory/purchase-orders'
     | '/inventory/stock-movements'
     | '/inventory/suppliers'
+    | '/investment/capital-calls'
+    | '/investment/distributions'
+    | '/investment/investors'
+    | '/investment/milestones'
+    | '/investment/payments'
+    | '/investment/projects'
+    | '/investment/reports'
+    | '/investment/share-classes'
+    | '/investment/shareholders'
     | '/pos/customers'
     | '/pos/discounts'
     | '/pos/gift-cards'
@@ -307,6 +405,7 @@ export interface FileRouteTypes {
     | '/pos/sales'
     | '/accounting/'
     | '/inventory/'
+    | '/investment/'
     | '/pos/'
     | '/api/auth/$'
     | '/api/rpc/$'
@@ -315,7 +414,6 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/login'
-    | '/todos'
     | '/accounting/chart-of-accounts'
     | '/accounting/expenses'
     | '/accounting/journal-entries'
@@ -327,6 +425,15 @@ export interface FileRouteTypes {
     | '/inventory/purchase-orders'
     | '/inventory/stock-movements'
     | '/inventory/suppliers'
+    | '/investment/capital-calls'
+    | '/investment/distributions'
+    | '/investment/investors'
+    | '/investment/milestones'
+    | '/investment/payments'
+    | '/investment/projects'
+    | '/investment/reports'
+    | '/investment/share-classes'
+    | '/investment/shareholders'
     | '/pos/customers'
     | '/pos/discounts'
     | '/pos/gift-cards'
@@ -335,6 +442,7 @@ export interface FileRouteTypes {
     | '/pos/sales'
     | '/accounting'
     | '/inventory'
+    | '/investment'
     | '/pos'
     | '/api/auth/$'
     | '/api/rpc/$'
@@ -344,9 +452,9 @@ export interface FileRouteTypes {
     | '/accounting'
     | '/dashboard'
     | '/inventory'
+    | '/investment'
     | '/login'
     | '/pos'
-    | '/todos'
     | '/accounting/chart-of-accounts'
     | '/accounting/expenses'
     | '/accounting/journal-entries'
@@ -358,6 +466,15 @@ export interface FileRouteTypes {
     | '/inventory/purchase-orders'
     | '/inventory/stock-movements'
     | '/inventory/suppliers'
+    | '/investment/capital-calls'
+    | '/investment/distributions'
+    | '/investment/investors'
+    | '/investment/milestones'
+    | '/investment/payments'
+    | '/investment/projects'
+    | '/investment/reports'
+    | '/investment/share-classes'
+    | '/investment/shareholders'
     | '/pos/customers'
     | '/pos/discounts'
     | '/pos/gift-cards'
@@ -366,6 +483,7 @@ export interface FileRouteTypes {
     | '/pos/sales'
     | '/accounting/'
     | '/inventory/'
+    | '/investment/'
     | '/pos/'
     | '/api/auth/$'
     | '/api/rpc/$'
@@ -376,22 +494,15 @@ export interface RootRouteChildren {
   AccountingRoute: typeof AccountingRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   InventoryRoute: typeof InventoryRouteWithChildren
+  InvestmentRoute: typeof InvestmentRouteWithChildren
   LoginRoute: typeof LoginRoute
   PosRoute: typeof PosRouteWithChildren
-  TodosRoute: typeof TodosRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiRpcSplatRoute: typeof ApiRpcSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/todos': {
-      id: '/todos'
-      path: '/todos'
-      fullPath: '/todos'
-      preLoaderRoute: typeof TodosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/pos': {
       id: '/pos'
       path: '/pos'
@@ -404,6 +515,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/investment': {
+      id: '/investment'
+      path: '/investment'
+      fullPath: '/investment'
+      preLoaderRoute: typeof InvestmentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inventory': {
@@ -440,6 +558,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/pos/'
       preLoaderRoute: typeof PosIndexRouteImport
       parentRoute: typeof PosRoute
+    }
+    '/investment/': {
+      id: '/investment/'
+      path: '/'
+      fullPath: '/investment/'
+      preLoaderRoute: typeof InvestmentIndexRouteImport
+      parentRoute: typeof InvestmentRoute
     }
     '/inventory/': {
       id: '/inventory/'
@@ -496,6 +621,69 @@ declare module '@tanstack/react-router' {
       fullPath: '/pos/customers'
       preLoaderRoute: typeof PosCustomersRouteImport
       parentRoute: typeof PosRoute
+    }
+    '/investment/shareholders': {
+      id: '/investment/shareholders'
+      path: '/shareholders'
+      fullPath: '/investment/shareholders'
+      preLoaderRoute: typeof InvestmentShareholdersRouteImport
+      parentRoute: typeof InvestmentRoute
+    }
+    '/investment/share-classes': {
+      id: '/investment/share-classes'
+      path: '/share-classes'
+      fullPath: '/investment/share-classes'
+      preLoaderRoute: typeof InvestmentShareClassesRouteImport
+      parentRoute: typeof InvestmentRoute
+    }
+    '/investment/reports': {
+      id: '/investment/reports'
+      path: '/reports'
+      fullPath: '/investment/reports'
+      preLoaderRoute: typeof InvestmentReportsRouteImport
+      parentRoute: typeof InvestmentRoute
+    }
+    '/investment/projects': {
+      id: '/investment/projects'
+      path: '/projects'
+      fullPath: '/investment/projects'
+      preLoaderRoute: typeof InvestmentProjectsRouteImport
+      parentRoute: typeof InvestmentRoute
+    }
+    '/investment/payments': {
+      id: '/investment/payments'
+      path: '/payments'
+      fullPath: '/investment/payments'
+      preLoaderRoute: typeof InvestmentPaymentsRouteImport
+      parentRoute: typeof InvestmentRoute
+    }
+    '/investment/milestones': {
+      id: '/investment/milestones'
+      path: '/milestones'
+      fullPath: '/investment/milestones'
+      preLoaderRoute: typeof InvestmentMilestonesRouteImport
+      parentRoute: typeof InvestmentRoute
+    }
+    '/investment/investors': {
+      id: '/investment/investors'
+      path: '/investors'
+      fullPath: '/investment/investors'
+      preLoaderRoute: typeof InvestmentInvestorsRouteImport
+      parentRoute: typeof InvestmentRoute
+    }
+    '/investment/distributions': {
+      id: '/investment/distributions'
+      path: '/distributions'
+      fullPath: '/investment/distributions'
+      preLoaderRoute: typeof InvestmentDistributionsRouteImport
+      parentRoute: typeof InvestmentRoute
+    }
+    '/investment/capital-calls': {
+      id: '/investment/capital-calls'
+      path: '/capital-calls'
+      fullPath: '/investment/capital-calls'
+      preLoaderRoute: typeof InvestmentCapitalCallsRouteImport
+      parentRoute: typeof InvestmentRoute
     }
     '/inventory/suppliers': {
       id: '/inventory/suppliers'
@@ -637,6 +825,36 @@ const InventoryRouteWithChildren = InventoryRoute._addFileChildren(
   InventoryRouteChildren,
 )
 
+interface InvestmentRouteChildren {
+  InvestmentCapitalCallsRoute: typeof InvestmentCapitalCallsRoute
+  InvestmentDistributionsRoute: typeof InvestmentDistributionsRoute
+  InvestmentInvestorsRoute: typeof InvestmentInvestorsRoute
+  InvestmentMilestonesRoute: typeof InvestmentMilestonesRoute
+  InvestmentPaymentsRoute: typeof InvestmentPaymentsRoute
+  InvestmentProjectsRoute: typeof InvestmentProjectsRoute
+  InvestmentReportsRoute: typeof InvestmentReportsRoute
+  InvestmentShareClassesRoute: typeof InvestmentShareClassesRoute
+  InvestmentShareholdersRoute: typeof InvestmentShareholdersRoute
+  InvestmentIndexRoute: typeof InvestmentIndexRoute
+}
+
+const InvestmentRouteChildren: InvestmentRouteChildren = {
+  InvestmentCapitalCallsRoute: InvestmentCapitalCallsRoute,
+  InvestmentDistributionsRoute: InvestmentDistributionsRoute,
+  InvestmentInvestorsRoute: InvestmentInvestorsRoute,
+  InvestmentMilestonesRoute: InvestmentMilestonesRoute,
+  InvestmentPaymentsRoute: InvestmentPaymentsRoute,
+  InvestmentProjectsRoute: InvestmentProjectsRoute,
+  InvestmentReportsRoute: InvestmentReportsRoute,
+  InvestmentShareClassesRoute: InvestmentShareClassesRoute,
+  InvestmentShareholdersRoute: InvestmentShareholdersRoute,
+  InvestmentIndexRoute: InvestmentIndexRoute,
+}
+
+const InvestmentRouteWithChildren = InvestmentRoute._addFileChildren(
+  InvestmentRouteChildren,
+)
+
 interface PosRouteChildren {
   PosCustomersRoute: typeof PosCustomersRoute
   PosDiscountsRoute: typeof PosDiscountsRoute
@@ -664,9 +882,9 @@ const rootRouteChildren: RootRouteChildren = {
   AccountingRoute: AccountingRouteWithChildren,
   DashboardRoute: DashboardRoute,
   InventoryRoute: InventoryRouteWithChildren,
+  InvestmentRoute: InvestmentRouteWithChildren,
   LoginRoute: LoginRoute,
   PosRoute: PosRouteWithChildren,
-  TodosRoute: TodosRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiRpcSplatRoute: ApiRpcSplatRoute,
 }

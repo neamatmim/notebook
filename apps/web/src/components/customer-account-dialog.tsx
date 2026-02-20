@@ -215,7 +215,10 @@ export function CustomerAccountDialog({
                 [
                   ["overview", "Overview"],
                   ["purchases", `Purchases (${data?.recentSales.length ?? 0})`],
-                  ["payments", `Payments (${data?.allPayments.length ?? 0})`],
+                  [
+                    "payments",
+                    `Payments (${(data?.allPayments.length ?? 0) + (data?.dueCollectionHistory.filter((d) => d.status !== "voided").length ?? 0)})`,
+                  ],
                 ] as const
               ).map(([key, label]) => (
                 <button
@@ -275,7 +278,12 @@ export function CustomerAccountDialog({
                         Payments by Method
                       </p>
                       <div className="space-y-1.5">
-                        {Object.entries(data!.paymentMethodTotals)
+                        {(
+                          Object.entries(data!.paymentMethodTotals) as [
+                            string,
+                            number,
+                          ][]
+                        )
                           .toSorted(([, a], [, b]) => b - a)
                           .map(([method, total]) => (
                             <div
@@ -424,73 +432,144 @@ export function CustomerAccountDialog({
 
               {/* Payments tab */}
               {tab === "payments" && (
-                <div className="overflow-x-auto">
-                  {data?.allPayments.length === 0 ? (
-                    <div className="text-muted-foreground flex flex-col items-center gap-2 py-12">
-                      <CreditCard className="h-8 w-8 opacity-40" />
-                      <p>No payments recorded.</p>
-                    </div>
-                  ) : (
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b text-left">
-                          <th className="py-2 pr-3 font-medium">Date</th>
-                          <th className="py-2 pr-3 font-medium">Receipt #</th>
-                          <th className="py-2 pr-3 font-medium">Method</th>
-                          <th className="py-2 pr-3 font-medium">Reference</th>
-                          <th className="py-2 text-right font-medium">
-                            Amount
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data?.allPayments.map((p) => (
-                          <tr key={p.id} className="border-b hover:bg-muted/30">
-                            <td className="text-muted-foreground py-2 pr-3">
-                              {fmtDate(p.processedAt)}
-                            </td>
-                            <td className="py-2 pr-3 font-mono text-xs">
-                              {p.receiptNumber ?? "—"}
-                            </td>
-                            <td className="py-2 pr-3">
-                              <span
-                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${METHOD_COLORS[p.method] ?? "bg-gray-100 text-gray-700"}`}
-                              >
-                                {METHOD_LABELS[p.method] ?? p.method}
-                              </span>
-                              {p.cardType && (
-                                <span className="text-muted-foreground ml-1 text-xs">
-                                  {p.cardType}
-                                  {p.cardLast4 ? ` ••••${p.cardLast4}` : ""}
+                <div className="space-y-6">
+                  {/* Sale payments */}
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Sale Payments
+                    </p>
+                    {(data?.allPayments.length ?? 0) === 0 ? (
+                      <p className="text-muted-foreground py-4 text-center text-sm">
+                        No sale payments recorded.
+                      </p>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left">
+                            <th className="py-2 pr-3 font-medium">Date</th>
+                            <th className="py-2 pr-3 font-medium">Receipt #</th>
+                            <th className="py-2 pr-3 font-medium">Method</th>
+                            <th className="py-2 pr-3 font-medium">Reference</th>
+                            <th className="py-2 text-right font-medium">
+                              Amount
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data?.allPayments.map((p) => (
+                            <tr
+                              key={p.id}
+                              className="border-b hover:bg-muted/30"
+                            >
+                              <td className="text-muted-foreground py-2 pr-3">
+                                {fmtDate(p.processedAt)}
+                              </td>
+                              <td className="py-2 pr-3 font-mono text-xs">
+                                {p.receiptNumber ?? "—"}
+                              </td>
+                              <td className="py-2 pr-3">
+                                <span
+                                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${METHOD_COLORS[p.method] ?? "bg-gray-100 text-gray-700"}`}
+                                >
+                                  {METHOD_LABELS[p.method] ?? p.method}
                                 </span>
+                                {p.cardType && (
+                                  <span className="text-muted-foreground ml-1 text-xs">
+                                    {p.cardType}
+                                    {p.cardLast4 ? ` ••••${p.cardLast4}` : ""}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="text-muted-foreground py-2 pr-3 font-mono text-xs">
+                                {p.reference ?? p.authCode ?? "—"}
+                              </td>
+                              <td className="py-2 text-right font-mono font-semibold">
+                                {fmt(p.amount)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+
+                  {/* Due collections */}
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Due Collections
+                    </p>
+                    {(data?.dueCollectionHistory.length ?? 0) === 0 ? (
+                      <p className="text-muted-foreground py-4 text-center text-sm">
+                        No due collections recorded.
+                      </p>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left">
+                            <th className="py-2 pr-3 font-medium">Date</th>
+                            <th className="py-2 pr-3 font-medium">Receipt #</th>
+                            <th className="py-2 pr-3 font-medium">Method</th>
+                            <th className="py-2 pr-3 font-medium">Reference</th>
+                            <th className="py-2 text-right font-medium">
+                              Amount
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data?.dueCollectionHistory.map((d) => {
+                            const isVoided = d.status === "voided";
+                            return (
+                              <tr
+                                key={d.id}
+                                className={`border-b hover:bg-muted/30 ${isVoided ? "opacity-50" : ""}`}
+                              >
+                                <td className="text-muted-foreground py-2 pr-3">
+                                  {fmtDate(d.collectedAt)}
+                                </td>
+                                <td className="py-2 pr-3 font-mono text-xs">
+                                  {d.receiptNumber ?? "—"}
+                                </td>
+                                <td className="py-2 pr-3">
+                                  <span
+                                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${METHOD_COLORS[d.method] ?? "bg-gray-100 text-gray-700"}`}
+                                  >
+                                    {METHOD_LABELS[d.method] ?? d.method}
+                                  </span>
+                                  {isVoided && (
+                                    <span className="ml-1.5 inline-flex rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-600">
+                                      Voided
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="text-muted-foreground py-2 pr-3 font-mono text-xs">
+                                  {d.reference ?? "—"}
+                                </td>
+                                <td
+                                  className={`py-2 text-right font-mono font-semibold ${isVoided ? "text-muted-foreground line-through" : "text-green-700"}`}
+                                >
+                                  {fmt(d.amount)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t font-semibold">
+                            <td colSpan={4} className="py-2">
+                              Total Collected
+                            </td>
+                            <td className="py-2 text-right font-mono text-green-700">
+                              {fmt(
+                                data?.dueCollectionHistory
+                                  .filter((d) => d.status !== "voided")
+                                  .reduce((sum, d) => sum + Number(d.amount), 0)
                               )}
                             </td>
-                            <td className="text-muted-foreground py-2 pr-3 font-mono text-xs">
-                              {p.reference ?? p.authCode ?? "—"}
-                            </td>
-                            <td className="py-2 text-right font-mono font-semibold">
-                              {fmt(p.amount)}
-                            </td>
                           </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t font-semibold">
-                          <td colSpan={4} className="py-2">
-                            Total Paid
-                          </td>
-                          <td className="py-2 text-right font-mono text-green-700">
-                            {fmt(
-                              data?.allPayments.reduce(
-                                (sum, p) => sum + Number(p.amount),
-                                0
-                              )
-                            )}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  )}
+                        </tfoot>
+                      </table>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

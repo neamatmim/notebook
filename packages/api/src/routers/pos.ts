@@ -5,6 +5,7 @@ import { db } from "@notebook/db";
 import {
   customers,
   discounts,
+  dueCollections,
   employees,
   giftCardTransactions,
   giftCards,
@@ -25,7 +26,10 @@ import { and, desc, eq, gte, inArray, lte, sql, sum } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure } from "../index";
-import { postSaleJournalEntry } from "./accounting";
+import {
+  postDueCollectionJournalEntry,
+  postSaleJournalEntry,
+} from "./accounting";
 
 async function resolveEmployeeId(
   tx: PgTransaction<any, any, ExtractTablesWithRelations<any>>,
@@ -230,12 +234,6 @@ const createGiftCardSchema = z.object({
   notes: z.string().optional(),
 });
 
-const redeemGiftCardSchema = z.object({
-  amount: z.string(),
-  cardNumber: z.string(),
-  saleId: z.string().uuid(),
-});
-
 const searchSchema = z.object({
   limit: z.number().int().min(1).max(100).default(20),
   offset: z.number().int().min(0).default(0),
@@ -319,6 +317,25 @@ export const posRouter = {
                 .orderBy(desc(payments.processedAt))
             : [];
 
+        // Due collection history (include voided records so they appear in the
+        // audit trail, but the UI marks them clearly and excludes them from totals)
+        const dueCollectionHistory = await db
+          .select({
+            amount: dueCollections.amount,
+            collectedAt: dueCollections.collectedAt,
+            id: dueCollections.id,
+            method: dueCollections.method,
+            notes: dueCollections.notes,
+            receiptNumber: sales.receiptNumber,
+            reference: dueCollections.reference,
+            saleId: dueCollections.saleId,
+            status: dueCollections.status,
+          })
+          .from(dueCollections)
+          .leftJoin(sales, eq(dueCollections.saleId, sales.id))
+          .where(eq(dueCollections.customerId, input.id))
+          .orderBy(desc(dueCollections.collectedAt));
+
         // Payment method totals
         const paymentMethodTotals = allPayments.reduce<Record<string, number>>(
           (acc, p) => {
@@ -331,6 +348,7 @@ export const posRouter = {
         return {
           allPayments,
           customer,
+          dueCollectionHistory,
           paymentMethodTotals,
           recentSales,
           summary: {
@@ -418,7 +436,7 @@ export const posRouter = {
           ]),
         })
       )
-      .handler(async ({ input }) => {
+      .handler(async ({ input, context }) => {
         const amt = Number(input.amount);
         if (amt <= 0) {
           throw new ORPCError("BAD_REQUEST", {
@@ -426,31 +444,70 @@ export const posRouter = {
           });
         }
 
-        const [cust] = await db
-          .select({ dueBalance: customers.dueBalance, id: customers.id })
-          .from(customers)
-          .where(eq(customers.id, input.customerId))
-          .limit(1);
+        const collectionDate = new Date();
 
-        if (!cust) {
-          throw new ORPCError("NOT_FOUND", { message: "Customer not found." });
+        const updated = await db.transaction(async (tx) => {
+          const [cust] = await tx
+            .select({ dueBalance: customers.dueBalance, id: customers.id })
+            .from(customers)
+            .where(eq(customers.id, input.customerId))
+            .limit(1);
+
+          if (!cust) {
+            throw new ORPCError("NOT_FOUND", {
+              message: "Customer not found.",
+            });
+          }
+          if (Number(cust.dueBalance) < amt) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: `Customer only owes $${Number(cust.dueBalance).toFixed(2)}.`,
+            });
+          }
+
+          const [row] = await tx
+            .update(customers)
+            .set({
+              dueBalance: sql`${customers.dueBalance} - ${amt}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(customers.id, input.customerId))
+            .returning({ dueBalance: customers.dueBalance, id: customers.id });
+
+          const [dcRow] = await tx
+            .insert(dueCollections)
+            .values({
+              amount: input.amount,
+              collectedAt: collectionDate,
+              customerId: input.customerId,
+              method: input.method,
+            })
+            .returning({ id: dueCollections.id });
+
+          return { dcId: dcRow!.id, row };
+        });
+
+        // Post the accounting entry outside the transaction so a missing
+        // chart-of-accounts never rolls back the balance update.
+        // If it succeeds, link the JE back to the dueCollections record so
+        // voiding the JE can restore the customer's dueBalance.
+        try {
+          const jeResult = await postDueCollectionJournalEntry(
+            db,
+            { amount: input.amount, method: input.method },
+            collectionDate,
+            context.session.user.id
+          );
+          if (jeResult) {
+            await db
+              .update(dueCollections)
+              .set({ journalEntryId: jeResult.id })
+              .where(eq(dueCollections.id, updated.dcId));
+          }
+        } catch {
+          // Accounting not configured — balance update still succeeded
         }
-        if (Number(cust.dueBalance) < amt) {
-          throw new ORPCError("BAD_REQUEST", {
-            message: `Customer only owes $${Number(cust.dueBalance).toFixed(2)}.`,
-          });
-        }
 
-        const [updated] = await db
-          .update(customers)
-          .set({
-            dueBalance: sql`${customers.dueBalance} - ${amt}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(customers.id, input.customerId))
-          .returning({ dueBalance: customers.dueBalance, id: customers.id });
-
-        return updated;
+        return updated.row;
       }),
 
     get: protectedProcedure
@@ -673,6 +730,7 @@ export const posRouter = {
         const txResult = await db.transaction(async (tx) => {
           const employeeId = await resolveEmployeeId(tx, context.session.user);
           const receiptNumber = `REC-${Date.now()}`;
+          let checkoutDueCollectionId: string | null = null;
 
           let subtotal = 0;
           for (const item of input.items) {
@@ -724,7 +782,7 @@ export const posRouter = {
               notes: item.notes,
               productId: item.productId,
               quantity: item.quantity,
-              saleId: sale.id,
+              saleId: sale!.id,
               taxAmount: itemTaxAmount.toString(),
               totalPrice: (itemTotal - Number(item.discountAmount)).toString(),
               unitPrice: item.unitPrice,
@@ -746,7 +804,7 @@ export const posRouter = {
               .limit(1);
 
             if (stockLevel.length > 0) {
-              const currentQuantity = stockLevel[0].quantity;
+              const currentQuantity = stockLevel[0]!.quantity;
               const newQuantity = Math.max(0, currentQuantity - item.quantity);
 
               await tx
@@ -757,7 +815,7 @@ export const posRouter = {
                   quantity: newQuantity,
                   updatedAt: new Date(),
                 })
-                .where(eq(stockLevels.id, stockLevel[0].id));
+                .where(eq(stockLevels.id, stockLevel[0]!.id));
 
               await tx.insert(stockMovements).values({
                 locationId: input.locationId,
@@ -766,7 +824,7 @@ export const posRouter = {
                 productId: item.productId,
                 quantity: -item.quantity,
                 reason: "Sale transaction",
-                referenceId: sale.id,
+                referenceId: sale!.id,
                 referenceType: "sale",
                 type: "sale",
                 userId: context.session.user.id,
@@ -784,7 +842,7 @@ export const posRouter = {
               method: payment.method,
               processedAt: new Date(),
               reference: payment.reference,
-              saleId: sale.id,
+              saleId: sale!.id,
               status: "completed",
               transactionId: payment.transactionId,
             });
@@ -833,7 +891,7 @@ export const posRouter = {
                 balanceBefore: gc.currentBalance,
                 employeeId,
                 giftCardId: gc.id,
-                saleId: sale.id,
+                saleId: sale!.id,
                 type: "redemption",
               });
             }
@@ -917,6 +975,18 @@ export const posRouter = {
                 updatedAt: new Date(),
               })
               .where(eq(customers.id, input.customerId));
+
+            const [checkoutDcRow] = await tx
+              .insert(dueCollections)
+              .values({
+                amount: input.dueCollection.amount,
+                customerId: input.customerId,
+                method: input.dueCollection.method,
+                saleId: sale!.id,
+              })
+              .returning({ id: dueCollections.id });
+
+            checkoutDueCollectionId = checkoutDcRow?.id ?? null;
           }
 
           if (input.customerId) {
@@ -942,7 +1012,9 @@ export const posRouter = {
           }
 
           return {
+            checkoutDueCollectionId,
             discountAmount: input.discountAmount,
+            dueCollection: input.dueCollection,
             payments: input.payments,
             sale,
             subtotal: subtotal.toString(),
@@ -950,8 +1022,8 @@ export const posRouter = {
           };
         });
 
-        // Auto-post accounting journal entry outside the main transaction so that
-        // a failure here (e.g. accounts not seeded) never rolls back the sale.
+        // Auto-post accounting journal entries outside the main transaction so
+        // that a failure here (e.g. accounts not seeded) never rolls back the sale.
         try {
           await postSaleJournalEntry(
             db,
@@ -970,6 +1042,29 @@ export const posRouter = {
           );
         } catch {
           // Accounting not configured — sale still succeeded
+        }
+
+        // Post a separate journal entry for any due collected at checkout
+        // (DR Cash / CR Accounts Receivable) and link the JE id back to the
+        // dueCollections record so voiding the JE can restore dueBalance.
+        if (txResult.dueCollection && txResult.checkoutDueCollectionId) {
+          try {
+            const jeResult = await postDueCollectionJournalEntry(
+              db,
+              txResult.dueCollection,
+              txResult.sale!.saleDate,
+              context.session.user.id,
+              txResult.sale!.id
+            );
+            if (jeResult) {
+              await db
+                .update(dueCollections)
+                .set({ journalEntryId: jeResult.id })
+                .where(eq(dueCollections.id, txResult.checkoutDueCollectionId));
+            }
+          } catch {
+            // Accounting not configured — collection still succeeded
+          }
         }
 
         return txResult.sale;
@@ -1243,7 +1338,10 @@ export const posRouter = {
           });
         }
 
-        if (discount.usageLimit && discount.usageCount >= discount.usageLimit) {
+        if (
+          discount.usageLimit &&
+          (discount.usageCount ?? 0) >= discount.usageLimit
+        ) {
           throw new ORPCError("BAD_REQUEST", {
             message: "Discount usage limit reached",
           });
@@ -1356,7 +1454,7 @@ export const posRouter = {
               quantityReturned: item.quantityReturned,
               refundAmount: refundAmount.toString(),
               restockable: item.restockable,
-              returnId: returnRecord.id,
+              returnId: returnRecord!.id,
               saleItemId: item.saleItemId,
               unitPrice: saleItem.unitPrice,
               variantId: saleItem.variantId,
@@ -1389,7 +1487,7 @@ export const posRouter = {
                     quantity: newQuantity,
                     updatedAt: new Date(),
                   })
-                  .where(eq(stockLevels.id, stockLevel[0].id));
+                  .where(eq(stockLevels.id, stockLevel[0]!.id));
               } else {
                 await tx.insert(stockLevels).values({
                   availableQuantity: newQuantity,
@@ -1408,7 +1506,7 @@ export const posRouter = {
                 productId: saleItem.productId,
                 quantity: item.quantityReturned,
                 reason: "Product return",
-                referenceId: returnRecord.id,
+                referenceId: returnRecord!.id,
                 referenceType: "return",
                 type: "return",
                 userId: context.session.user.id,
@@ -1568,64 +1666,11 @@ export const posRouter = {
             balanceAfter: input.initialAmount,
             balanceBefore: "0",
             employeeId,
-            giftCardId: giftCard.id,
+            giftCardId: giftCard!.id,
             type: "purchase",
           });
 
           return giftCard;
-        })
-    ),
-
-    redeem: protectedProcedure.input(redeemGiftCardSchema).handler(
-      async ({ input, context }) =>
-        await db.transaction(async (tx) => {
-          const employeeId = await resolveEmployeeId(tx, context.session.user);
-          const [giftCard] = await tx
-            .select()
-            .from(giftCards)
-            .where(
-              and(
-                eq(giftCards.cardNumber, input.cardNumber),
-                eq(giftCards.isActive, true)
-              )
-            )
-            .limit(1);
-
-          if (!giftCard) {
-            throw new ORPCError("NOT_FOUND", {
-              message: "Gift card not found",
-            });
-          }
-
-          if (Number(giftCard.currentBalance) < Number(input.amount)) {
-            throw new ORPCError("BAD_REQUEST", {
-              message: "Insufficient gift card balance",
-            });
-          }
-
-          const newBalance = (
-            Number(giftCard.currentBalance) - Number(input.amount)
-          ).toString();
-
-          await tx
-            .update(giftCards)
-            .set({
-              currentBalance: newBalance,
-              updatedAt: new Date(),
-            })
-            .where(eq(giftCards.id, giftCard.id));
-
-          await tx.insert(giftCardTransactions).values({
-            amount: input.amount,
-            balanceAfter: newBalance,
-            balanceBefore: giftCard.currentBalance,
-            employeeId,
-            giftCardId: giftCard.id,
-            saleId: input.saleId,
-            type: "redemption",
-          });
-
-          return { newBalance, success: true };
         })
     ),
   },

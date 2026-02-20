@@ -6,10 +6,14 @@ import { db } from "@notebook/db";
 import {
   accountingPeriods,
   accounts,
+  customers,
+  dueCollections,
   expenses,
   fiscalYears,
   journalEntries,
   journalEntryLines,
+  payments,
+  sales,
 } from "@notebook/db/schema";
 import { ORPCError } from "@orpc/server";
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
@@ -67,14 +71,28 @@ export async function postSaleJournalEntry(
   paymentLines: { amount: string; method: string }[],
   userId: string
 ) {
-  const codesToFetch = ["1000", "1100", "2200", "4000", "2100"];
+  // Always need revenue (4000) and tax (2100); debit accounts depend on
+  // which payment methods were actually used in this sale.
+  const requiredCodes = new Set(["4000", "2100"]);
+  for (const p of paymentLines) {
+    if (p.method === "on_account") {
+      requiredCodes.add("1100");
+    } else if (p.method === "store_credit") {
+      requiredCodes.add("2200");
+    } else if (p.method === "gift_card") {
+      requiredCodes.add("2300");
+    } else {
+      requiredCodes.add("1000");
+    }
+  }
+
   const acctRows = await tx
     .select({ code: accounts.code, id: accounts.id })
     .from(accounts)
-    .where(inArray(accounts.code, codesToFetch));
+    .where(inArray(accounts.code, [...requiredCodes]));
 
-  if (acctRows.length < codesToFetch.length) {
-    return;
+  if (acctRows.length < requiredCodes.size) {
+    return; // required accounts not seeded — skip silently
   }
 
   const byCode: Record<string, string> = {};
@@ -106,6 +124,8 @@ export async function postSaleJournalEntry(
       acctId = byCode["1100"]!;
     } else if (p.method === "store_credit") {
       acctId = byCode["2200"]!;
+    } else if (p.method === "gift_card") {
+      acctId = byCode["2300"]!;
     } else {
       acctId = byCode["1000"]!;
     }
@@ -181,6 +201,110 @@ export async function postSaleJournalEntry(
       type: l.type,
     }))
   );
+}
+
+/**
+ * Posts the accounting entry when a customer pays off their outstanding
+ * due balance alongside (or separately from) a sale.
+ *
+ * Entry:
+ *   DR  Cash (1000) [or Store Credit Liability (2200) if method=store_credit]
+ *   CR  Accounts Receivable (1100)
+ */
+export async function postDueCollectionJournalEntry(
+  tx: DbOrTx,
+  collection: { amount: string; method: string },
+  date: Date,
+  userId: string,
+  sourceId?: string
+): Promise<{ id: string } | null> {
+  // Only fetch the two accounts actually needed for this method.
+  const debitCode = collection.method === "store_credit" ? "2200" : "1000";
+  const codesToFetch = [debitCode, "1100"];
+
+  const acctRows = await tx
+    .select({ code: accounts.code, id: accounts.id })
+    .from(accounts)
+    .where(inArray(accounts.code, codesToFetch));
+
+  if (acctRows.length < 2) {
+    return null; // required accounts not seeded — skip silently
+  }
+
+  const byCode: Record<string, string> = {};
+  for (const r of acctRows) {
+    byCode[r.code] = r.id;
+  }
+
+  const [period] = await tx
+    .select({ id: accountingPeriods.id })
+    .from(accountingPeriods)
+    .where(
+      and(
+        eq(accountingPeriods.status, "open"),
+        lte(accountingPeriods.startDate, date),
+        gte(accountingPeriods.endDate, date)
+      )
+    )
+    .limit(1);
+
+  const [countRow] = await tx
+    .select({ count: sql<number>`count(*)` })
+    .from(journalEntries);
+  const entryNumber = `JE-${String((countRow?.count ?? 0) + 1).padStart(5, "0")}`;
+
+  const amount = Number(collection.amount);
+  // store_credit reduces that liability; everything else hits Cash
+  const debitAccountId =
+    collection.method === "store_credit" ? byCode["2200"]! : byCode["1000"]!;
+  const creditAccountId = byCode["1100"]!;
+
+  const [entry] = await tx
+    .insert(journalEntries)
+    .values({
+      createdBy: userId,
+      date,
+      description: "Due Collection",
+      entryNumber,
+      periodId: period?.id ?? null,
+      postedAt: new Date(),
+      sourceId: sourceId ?? null,
+      sourceType: sourceId ? "sale" : "manual",
+      status: "posted",
+      totalCredit: amount.toString(),
+      totalDebit: amount.toString(),
+    })
+    .returning({ id: journalEntries.id });
+
+  const lines = [
+    {
+      accountId: debitAccountId,
+      amount: amount.toString(),
+      description: "Due collection — payment received",
+      entryId: entry!.id,
+      type: "debit" as const,
+    },
+    {
+      accountId: creditAccountId,
+      amount: amount.toString(),
+      description: "Due collection — outstanding balance cleared",
+      entryId: entry!.id,
+      type: "credit" as const,
+    },
+  ];
+
+  await tx.insert(journalEntryLines).values(lines);
+
+  await updateAccountBalances(
+    tx,
+    lines.map((l) => ({
+      accountId: l.accountId,
+      amount: l.amount,
+      type: l.type,
+    }))
+  );
+
+  return { id: entry!.id };
 }
 
 const DEFAULT_ACCOUNTS = [
@@ -1158,7 +1282,12 @@ export const accountingRouter = {
       ),
 
     void: protectedProcedure
-      .input(z.object({ id: z.string().uuid() }))
+      .input(
+        z.object({
+          id: z.string().uuid(),
+          reason: z.string().min(1).optional(),
+        })
+      )
       .handler(async ({ input }) =>
         db.transaction(async (tx) => {
           const [entry] = await tx
@@ -1176,6 +1305,22 @@ export const accountingRouter = {
             throw new ORPCError("NOT_FOUND", {
               message: "Posted journal entry not found",
             });
+          }
+
+          // Prevent voiding entries in a locked accounting period
+          if (entry.periodId) {
+            const [period] = await tx
+              .select({ status: accountingPeriods.status })
+              .from(accountingPeriods)
+              .where(eq(accountingPeriods.id, entry.periodId))
+              .limit(1);
+
+            if (period?.status === "locked") {
+              throw new ORPCError("BAD_REQUEST", {
+                message:
+                  "Cannot void an entry in a locked accounting period. Close the period lock first.",
+              });
+            }
           }
 
           const lines = await tx
@@ -1196,9 +1341,82 @@ export const accountingRouter = {
             }))
           );
 
+          // ── POS cascade ─────────────────────────────────────────────────
+          // 1. If this JE is linked to a due-collection record, restore the
+          //    customer's dueBalance (the payment is being un-done).
+          const linkedCollections = await tx
+            .select({
+              amount: dueCollections.amount,
+              customerId: dueCollections.customerId,
+              id: dueCollections.id,
+            })
+            .from(dueCollections)
+            .where(eq(dueCollections.journalEntryId, input.id));
+
+          for (const dc of linkedCollections) {
+            await tx
+              .update(customers)
+              .set({
+                dueBalance: sql`${customers.dueBalance} + ${Number(dc.amount)}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(customers.id, dc.customerId));
+
+            // Mark the collection as voided so it no longer appears as an
+            // active payment in the customer's history and the restored
+            // dueBalance is consistent with the displayed records.
+            await tx
+              .update(dueCollections)
+              .set({ journalEntryId: null, status: "voided" })
+              .where(eq(dueCollections.id, dc.id));
+          }
+
+          // 2. If this JE came from a sale, reverse any on_account balance
+          //    increases (the recorded debt should no longer exist).
+          if (entry.sourceType === "sale" && entry.sourceId) {
+            const onAccountRows = await tx
+              .select({ amount: payments.amount })
+              .from(payments)
+              .where(
+                and(
+                  eq(payments.saleId, entry.sourceId),
+                  eq(payments.method, "on_account")
+                )
+              );
+
+            if (onAccountRows.length > 0) {
+              const [saleRow] = await tx
+                .select({ customerId: sales.customerId })
+                .from(sales)
+                .where(eq(sales.id, entry.sourceId))
+                .limit(1);
+
+              if (saleRow?.customerId) {
+                const onAccountTotal = onAccountRows.reduce(
+                  (s, p) => s + Number(p.amount),
+                  0
+                );
+                await tx
+                  .update(customers)
+                  .set({
+                    dueBalance: sql`${customers.dueBalance} - ${onAccountTotal}`,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(customers.id, saleRow.customerId));
+              }
+            }
+          }
+          // ────────────────────────────────────────────────────────────────
+
+          const now = new Date();
           const [voided] = await tx
             .update(journalEntries)
-            .set({ status: "void", updatedAt: new Date() })
+            .set({
+              status: "void",
+              updatedAt: now,
+              voidedAt: now,
+              voidReason: input.reason ?? null,
+            })
             .where(eq(journalEntries.id, input.id))
             .returning();
 

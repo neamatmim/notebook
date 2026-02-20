@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -22,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { orpc } from "@/utils/orpc";
 
 type JEStatus = "draft" | "posted" | "void";
@@ -55,6 +57,10 @@ function JournalEntriesPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [viewId, setViewId] = useState<string | null>(null);
+
+  // Void confirmation state
+  const [voidId, setVoidId] = useState<string | null>(null);
+  const [voidReason, setVoidReason] = useState("");
 
   const [jeDate, setJeDate] = useState("");
   const [jeDesc, setJeDesc] = useState("");
@@ -101,13 +107,22 @@ function JournalEntriesPage() {
 
   const postMutation = useMutation({
     ...orpc.accounting.journalEntries.post.mutationOptions(),
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success("Journal entry posted.");
+    },
     onError: (err) => toast.error(err.message),
   });
 
   const voidMutation = useMutation({
     ...orpc.accounting.journalEntries.void.mutationOptions(),
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setVoidId(null);
+      setVoidReason("");
+      // Refresh detail view if we just voided the open entry
+      toast.success("Journal entry voided.");
+    },
     onError: (err) => toast.error(err.message),
   });
 
@@ -157,6 +172,21 @@ function JournalEntriesPage() {
       })),
       reference: jeRef || undefined,
       sourceType: "manual",
+    });
+  };
+
+  const openVoidDialog = (id: string) => {
+    setVoidId(id);
+    setVoidReason("");
+  };
+
+  const confirmVoid = () => {
+    if (!voidId) {
+      return;
+    }
+    voidMutation.mutate({
+      id: voidId,
+      reason: voidReason.trim() || undefined,
     });
   };
 
@@ -271,9 +301,7 @@ function JournalEntriesPage() {
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => {
-                              voidMutation.mutate({ id: entry.id });
-                            }}
+                            onClick={() => openVoidDialog(entry.id)}
                             disabled={voidMutation.isPending}
                           >
                             Void
@@ -299,7 +327,7 @@ function JournalEntriesPage() {
         </CardContent>
       </Card>
 
-      {/* View Dialog */}
+      {/* View / Detail Dialog */}
       {viewId && entryDetail && (
         <Dialog open={!!viewId} onOpenChange={() => setViewId(null)}>
           <DialogContent className="max-w-2xl">
@@ -309,7 +337,7 @@ function JournalEntriesPage() {
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-2 text-sm">
-              <div className="flex gap-4">
+              <div className="flex flex-wrap gap-4">
                 <span className="text-muted-foreground">Date:</span>
                 <span>{new Date(entryDetail.date).toLocaleDateString()}</span>
                 <span className="text-muted-foreground">Status:</span>
@@ -318,12 +346,33 @@ function JournalEntriesPage() {
                 >
                   {entryDetail.status}
                 </span>
+                <span className="text-muted-foreground">Source:</span>
+                <span
+                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${SOURCE_COLORS[entryDetail.sourceType as SourceType]}`}
+                >
+                  {entryDetail.sourceType}
+                </span>
               </div>
               {entryDetail.reference && (
                 <p>
                   <span className="text-muted-foreground">Ref:</span>{" "}
                   {entryDetail.reference}
                 </p>
+              )}
+              {entryDetail.status === "void" && (
+                <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-red-700">
+                  <p className="font-medium">Voided</p>
+                  {entryDetail.voidedAt && (
+                    <p className="text-xs">
+                      {new Date(entryDetail.voidedAt).toLocaleString()}
+                    </p>
+                  )}
+                  {entryDetail.voidReason && (
+                    <p className="mt-1 text-xs">
+                      Reason: {entryDetail.voidReason}
+                    </p>
+                  )}
+                </div>
               )}
               <table className="mt-3 w-full text-sm">
                 <thead>
@@ -349,6 +398,17 @@ function JournalEntriesPage() {
               </table>
             </div>
             <DialogFooter>
+              {entryDetail.status === "posted" && (
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setViewId(null);
+                    openVoidDialog(entryDetail.id);
+                  }}
+                >
+                  Void Entry
+                </Button>
+              )}
               <Button variant="outline" onClick={() => setViewId(null)}>
                 Close
               </Button>
@@ -356,6 +416,58 @@ function JournalEntriesPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Void Confirmation Dialog */}
+      <Dialog
+        open={!!voidId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setVoidId(null);
+            setVoidReason("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Void Journal Entry</DialogTitle>
+            <DialogDescription>
+              This will reverse all account balance changes made by this entry.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            <Label htmlFor="void-reason">Reason (optional)</Label>
+            <Textarea
+              id="void-reason"
+              placeholder="e.g. Entered in wrong period, duplicate entry…"
+              value={voidReason}
+              onChange={(e) => setVoidReason(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setVoidId(null);
+                setVoidReason("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={voidMutation.isPending}
+              onClick={confirmVoid}
+            >
+              {voidMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Confirm Void
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -409,7 +521,9 @@ function JournalEntriesPage() {
                     <Select
                       value={line.accountId || "__none__"}
                       onValueChange={(v) =>
-                        updateLine(i, { accountId: v === "__none__" ? "" : v })
+                        updateLine(i, {
+                          accountId: !v || v === "__none__" ? "" : v,
+                        })
                       }
                     >
                       <SelectTrigger className="flex-1">

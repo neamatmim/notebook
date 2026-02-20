@@ -13,6 +13,11 @@ import {
 
 import { locations, products, productVariants } from "./inventory";
 
+export const dueCollectionStatusEnum = pgEnum("due_collection_status", [
+  "active",
+  "voided",
+]);
+
 export const saleStatusEnum = pgEnum("sale_status", [
   "pending",
   "completed",
@@ -483,3 +488,32 @@ export const giftCardTransactionsRelations = relations(
     }),
   })
 );
+
+// Tracks every instance of a customer paying off outstanding due balance,
+// whether collected during a sale checkout or as a standalone payment.
+export const dueCollections = pgTable("due_collections", {
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  collectedAt: timestamp("collected_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  customerId: uuid("customer_id").notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  // Linked to the accounting journal entry so voiding the JE can restore
+  // the customer's dueBalance and vice-versa.
+  journalEntryId: uuid("journal_entry_id"),
+  method: paymentMethodEnum("method").notNull(),
+  notes: text("notes"),
+  reference: text("reference"),
+  saleId: uuid("sale_id"), // populated when collected during checkout
+  status: dueCollectionStatusEnum("status").default("active").notNull(),
+});
+
+export const dueCollectionsRelations = relations(dueCollections, ({ one }) => ({
+  customer: one(customers, {
+    fields: [dueCollections.customerId],
+    references: [customers.id],
+  }),
+  sale: one(sales, {
+    fields: [dueCollections.saleId],
+    references: [sales.id],
+  }),
+}));

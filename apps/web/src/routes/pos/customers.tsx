@@ -29,6 +29,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { queryClient, orpc } from "@/utils/orpc";
 
 const PAGE_SIZE = 20;
@@ -402,22 +409,25 @@ function CustomersPage() {
             </div>
             <div className="space-y-1">
               <Label htmlFor="collect-due-method">Payment Method</Label>
-              <select
-                id="collect-due-method"
+              <Select
                 value={collectDueMethod}
-                onChange={(e) =>
-                  setCollectDueMethod(e.target.value as CollectDueMethod)
+                onValueChange={(v) =>
+                  v && setCollectDueMethod(v as CollectDueMethod)
                 }
-                className="border-input bg-background flex h-8 w-full rounded-none border px-2.5 py-1 text-xs outline-none"
               >
-                <option value="cash">Cash</option>
-                <option value="credit_card">Credit Card</option>
-                <option value="debit_card">Debit Card</option>
-                <option value="mobile_payment">Mobile Payment</option>
-                <option value="check">Check</option>
-                <option value="gift_card">Gift Card</option>
-                <option value="store_credit">Store Credit</option>
-              </select>
+                <SelectTrigger id="collect-due-method" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="credit_card">Credit Card</SelectItem>
+                  <SelectItem value="debit_card">Debit Card</SelectItem>
+                  <SelectItem value="mobile_payment">Mobile Payment</SelectItem>
+                  <SelectItem value="check">Check</SelectItem>
+                  <SelectItem value="gift_card">Gift Card</SelectItem>
+                  <SelectItem value="store_credit">Store Credit</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

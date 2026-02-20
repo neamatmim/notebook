@@ -18,11 +18,18 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { queryClient, orpc } from "@/utils/orpc";
 import { printReceipt } from "@/utils/print-receipt";
 
-interface CartItem {
+export interface CartItem {
   id: string;
   name: string;
   price: number;
@@ -102,8 +109,8 @@ export function CheckoutDialog({
   >([]);
   const [pendingMethod, setPendingMethod] = useState<PaymentMethod>("cash");
   const [pendingAmount, setPendingAmount] = useState("");
-  const [pendingGiftCardNumber, setPendingGiftCardNumber] = useState("");
-  const [searchedGiftCardNumber, setSearchedGiftCardNumber] = useState("");
+  const [giftCardInput, setGiftCardInput] = useState("");
+  const [giftCardLookupKey, setGiftCardLookupKey] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [notes, setNotes] = useState("");
   const [successData, setSuccessData] = useState<SuccessData | null>(null);
@@ -129,8 +136,8 @@ export function CheckoutDialog({
 
   const giftCardQuery = useQuery(
     orpc.pos.giftCards.balance.queryOptions({
-      enabled: searchedGiftCardNumber.length > 0,
-      input: { cardNumber: searchedGiftCardNumber },
+      enabled: giftCardLookupKey.length > 0,
+      input: { cardNumber: giftCardLookupKey },
       retry: false,
     })
   );
@@ -207,8 +214,8 @@ export function CheckoutDialog({
     setPaymentLines([]);
     setPendingMethod("cash");
     setPendingAmount("");
-    setPendingGiftCardNumber("");
-    setSearchedGiftCardNumber("");
+    setGiftCardInput("");
+    setGiftCardLookupKey("");
     setCustomerId("");
     setNotes("");
     setSuccessData(null);
@@ -229,8 +236,8 @@ export function CheckoutDialog({
   const handleSelectMethod = (method: PaymentMethod) => {
     setPendingMethod(method);
     if (method !== "gift_card") {
-      setPendingGiftCardNumber("");
-      setSearchedGiftCardNumber("");
+      setGiftCardInput("");
+      setGiftCardLookupKey("");
     }
     if (method === "store_credit") {
       setPendingAmount(Math.min(remainingCredit, remaining).toFixed(2));
@@ -251,7 +258,7 @@ export function CheckoutDialog({
       return;
     }
     if (pendingMethod === "gift_card") {
-      if (!pendingGiftCardNumber.trim()) {
+      if (!giftCardInput.trim()) {
         toast.error("Enter the gift card number.");
         return;
       }
@@ -272,15 +279,13 @@ export function CheckoutDialog({
         method: pendingMethod,
         amount: pendingAmount,
         giftCardNumber:
-          pendingMethod === "gift_card"
-            ? pendingGiftCardNumber.trim()
-            : undefined,
+          pendingMethod === "gift_card" ? giftCardInput.trim() : undefined,
       },
     ]);
     setPendingAmount("");
     if (pendingMethod === "gift_card") {
-      setPendingGiftCardNumber("");
-      setSearchedGiftCardNumber("");
+      setGiftCardInput("");
+      setGiftCardLookupKey("");
     }
   };
 
@@ -379,7 +384,7 @@ export function CheckoutDialog({
     const finalLines = [...paymentLines];
     if (pendingAmount && Number(pendingAmount) > 0) {
       if (pendingMethod === "gift_card") {
-        if (!pendingGiftCardNumber.trim()) {
+        if (!giftCardInput.trim()) {
           toast.error("Enter the gift card number.");
           return;
         }
@@ -395,7 +400,7 @@ export function CheckoutDialog({
         }
         finalLines.push({
           amount: pendingAmount,
-          giftCardNumber: pendingGiftCardNumber.trim(),
+          giftCardNumber: giftCardInput.trim(),
           method: pendingMethod,
         });
       } else {
@@ -500,7 +505,7 @@ export function CheckoutDialog({
               <div className="space-y-1">
                 {successData.payments.map((p, i) => (
                   <div
-                    key={i}
+                    key={`${p.method}-${i}`}
                     className="flex justify-between text-muted-foreground"
                   >
                     <span>
@@ -626,20 +631,25 @@ export function CheckoutDialog({
               </div>
 
               <div className="space-y-2">
-                <Label>Customer (Optional)</Label>
-                <select
-                  id="checkout-customer"
-                  value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
-                  className="border-input bg-background flex h-8 w-full rounded-none border px-2.5 py-1 text-xs outline-none"
+                <Label htmlFor="checkout-customer">Customer (Optional)</Label>
+                <Select
+                  value={customerId || "__walkin__"}
+                  onValueChange={(v) =>
+                    setCustomerId(!v || v === "__walkin__" ? "" : v)
+                  }
                 >
-                  <option value="">Walk-in Customer</option>
-                  {(customersQuery.data?.items ?? []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.firstName} {c.lastName} ({c.customerNumber})
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="checkout-customer" className="w-full">
+                    <SelectValue placeholder="Walk-in Customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__walkin__">Walk-in Customer</SelectItem>
+                    {(customersQuery.data?.items ?? []).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.firstName} {c.lastName} ({c.customerNumber})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* ── Discounts ── */}
@@ -814,6 +824,15 @@ export function CheckoutDialog({
                       ["cash", "Cash"],
                       ["credit_card", "Credit"],
                       ["debit_card", "Debit"],
+                      ["mobile_payment", "Mobile"],
+                      ["gift_card", "Gift Card"],
+                      [
+                        "store_credit",
+                        customerId && remainingCredit > 0
+                          ? `Credit ($${remainingCredit.toFixed(2)})`
+                          : "Store Credit",
+                      ],
+                      ["on_account", "On Account"],
                     ] as const
                   ).map(([method, label]) => (
                     <Button
@@ -821,59 +840,16 @@ export function CheckoutDialog({
                       type="button"
                       variant={pendingMethod === method ? "default" : "outline"}
                       size="sm"
+                      disabled={
+                        (method === "store_credit" &&
+                          (!customerId || remainingCredit <= 0)) ||
+                        (method === "on_account" && !customerId)
+                      }
                       onClick={() => handleSelectMethod(method)}
                     >
                       {label}
                     </Button>
                   ))}
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <Button
-                    type="button"
-                    variant={
-                      pendingMethod === "mobile_payment" ? "default" : "outline"
-                    }
-                    size="sm"
-                    onClick={() => handleSelectMethod("mobile_payment")}
-                  >
-                    Mobile
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={
-                      pendingMethod === "gift_card" ? "default" : "outline"
-                    }
-                    size="sm"
-                    onClick={() => handleSelectMethod("gift_card")}
-                  >
-                    Gift Card
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={
-                      pendingMethod === "store_credit" ? "default" : "outline"
-                    }
-                    size="sm"
-                    disabled={!customerId || remainingCredit <= 0}
-                    onClick={() => handleSelectMethod("store_credit")}
-                  >
-                    {customerId && remainingCredit > 0
-                      ? `Store Credit ($${remainingCredit.toFixed(2)})`
-                      : "Store Credit"}
-                  </Button>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <Button
-                    type="button"
-                    variant={
-                      pendingMethod === "on_account" ? "default" : "outline"
-                    }
-                    size="sm"
-                    disabled={!customerId}
-                    onClick={() => handleSelectMethod("on_account")}
-                  >
-                    On Account
-                  </Button>
                 </div>
               </div>
 
@@ -885,18 +861,16 @@ export function CheckoutDialog({
                   <div className="flex gap-2">
                     <Input
                       id="gift-card-number"
-                      value={pendingGiftCardNumber}
+                      value={giftCardInput}
                       onChange={(e) => {
-                        setPendingGiftCardNumber(e.target.value);
-                        setSearchedGiftCardNumber("");
+                        setGiftCardInput(e.target.value);
+                        setGiftCardLookupKey("");
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
-                          if (pendingGiftCardNumber.trim()) {
-                            setSearchedGiftCardNumber(
-                              pendingGiftCardNumber.trim()
-                            );
+                          if (giftCardInput.trim()) {
+                            setGiftCardLookupKey(giftCardInput.trim());
                           }
                         }
                       }}
@@ -909,10 +883,8 @@ export function CheckoutDialog({
                       variant="outline"
                       className="shrink-0 border-purple-300 text-purple-700"
                       onClick={() => {
-                        if (pendingGiftCardNumber.trim()) {
-                          setSearchedGiftCardNumber(
-                            pendingGiftCardNumber.trim()
-                          );
+                        if (giftCardInput.trim()) {
+                          setGiftCardLookupKey(giftCardInput.trim());
                         }
                       }}
                     >
@@ -1008,7 +980,10 @@ export function CheckoutDialog({
               {paymentLines.length > 0 && (
                 <div className="space-y-1 rounded-md border p-2 text-sm">
                   {paymentLines.map((line, i) => (
-                    <div key={i} className="flex items-center justify-between">
+                    <div
+                      key={`${line.method}-${i}`}
+                      className="flex items-center justify-between"
+                    >
                       <span className="text-muted-foreground">
                         {METHOD_LABELS[line.method]}
                         {line.giftCardNumber && (
@@ -1105,24 +1080,37 @@ export function CheckoutDialog({
                         >
                           Payment Method
                         </Label>
-                        <select
-                          id="collect-due-method-checkout"
+                        <Select
                           value={collectDueMethod}
-                          onChange={(e) =>
-                            setCollectDueMethod(
-                              e.target.value as DueCollectMethod
-                            )
+                          onValueChange={(v) =>
+                            setCollectDueMethod(v as DueCollectMethod)
                           }
-                          className="border-input bg-background flex h-7 w-full rounded-none border px-2.5 py-1 text-xs outline-none"
                         >
-                          <option value="cash">Cash</option>
-                          <option value="credit_card">Credit Card</option>
-                          <option value="debit_card">Debit Card</option>
-                          <option value="mobile_payment">Mobile Payment</option>
-                          <option value="check">Check</option>
-                          <option value="gift_card">Gift Card</option>
-                          <option value="store_credit">Store Credit</option>
-                        </select>
+                          <SelectTrigger
+                            id="collect-due-method-checkout"
+                            size="sm"
+                            className="w-full"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cash">Cash</SelectItem>
+                            <SelectItem value="credit_card">
+                              Credit Card
+                            </SelectItem>
+                            <SelectItem value="debit_card">
+                              Debit Card
+                            </SelectItem>
+                            <SelectItem value="mobile_payment">
+                              Mobile Payment
+                            </SelectItem>
+                            <SelectItem value="check">Check</SelectItem>
+                            <SelectItem value="gift_card">Gift Card</SelectItem>
+                            <SelectItem value="store_credit">
+                              Store Credit
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   )}

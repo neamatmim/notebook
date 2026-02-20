@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   CreditCard,
-  DollarSign,
   MapPin,
   Minus,
   Package,
@@ -14,19 +13,20 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import type { CartItem } from "@/components/checkout-dialog";
+
 import { CheckoutDialog } from "@/components/checkout-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { orpc } from "@/utils/orpc";
-
-interface CartItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  sku: string;
-}
 
 function POSTerminal() {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -129,18 +129,24 @@ function POSTerminal() {
             <h1 className="text-2xl font-bold">Point of Sale Terminal</h1>
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-blue-500" />
-              <select
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
-                className="border-input bg-background flex h-8 rounded-none border px-2.5 py-1 text-xs outline-none"
+              <Select
+                value={locationId || "__none__"}
+                onValueChange={(v) =>
+                  setLocationId(!v || v === "__none__" ? "" : v)
+                }
               >
-                <option value="">Select Location</option>
-                {locationsList.map((loc) => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Select Location</SelectItem>
+                  {locationsList.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="relative">
@@ -268,7 +274,7 @@ function POSTerminal() {
           </div>
         </div>
 
-        <div className="mt-6 space-y-3">
+        <div className="mt-6">
           <Button
             className="w-full bg-green-600 text-white hover:bg-green-700"
             size="lg"
@@ -278,26 +284,6 @@ function POSTerminal() {
             <CreditCard className="mr-2 h-5 w-5" />
             Process Payment
           </Button>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={cart.length === 0 || !locationId}
-              onClick={handleCheckout}
-            >
-              <DollarSign className="mr-1 h-4 w-4" />
-              Cash
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={cart.length === 0 || !locationId}
-              onClick={handleCheckout}
-            >
-              <CreditCard className="mr-1 h-4 w-4" />
-              Card
-            </Button>
-          </div>
         </div>
       </div>
 
