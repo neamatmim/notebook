@@ -30,7 +30,7 @@ interface LineUpdate {
   type: "credit" | "debit";
 }
 
-async function updateAccountBalances(tx: DbOrTx, lines: LineUpdate[]) {
+export async function updateAccountBalances(tx: DbOrTx, lines: LineUpdate[]) {
   for (const line of lines) {
     const [acct] = await tx
       .select({ id: accounts.id, normalBalance: accounts.normalBalance })
@@ -57,6 +57,22 @@ async function updateAccountBalances(tx: DbOrTx, lines: LineUpdate[]) {
       })
       .where(eq(accounts.id, line.accountId));
   }
+}
+
+/**
+ * Generates a unique journal entry number using a timestamp + random suffix.
+ * This avoids the COUNT(*)+1 race condition that can produce duplicate numbers
+ * when two transactions run concurrently.
+ *
+ * Format: PREFIX-<base36-timestamp>-<4-hex-random>  e.g. JE-LVZ4J8T9-A3F7
+ */
+export function makeEntryNumber(prefix: string): string {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rnd = Math.floor(Math.random() * 0xFF_FF)
+    .toString(16)
+    .toUpperCase()
+    .padStart(4, "0");
+  return `${prefix}-${ts}-${rnd}`;
 }
 
 export async function postSaleJournalEntry(
@@ -112,10 +128,7 @@ export async function postSaleJournalEntry(
     )
     .limit(1);
 
-  const [countRow] = await tx
-    .select({ count: sql<number>`count(*)` })
-    .from(journalEntries);
-  const entryNumber = `JE-${String((countRow?.count ?? 0) + 1).padStart(5, "0")}`;
+  const entryNumber = makeEntryNumber("JE");
 
   const drMap: Record<string, number> = {};
   for (const p of paymentLines) {
@@ -204,6 +217,320 @@ export async function postSaleJournalEntry(
 }
 
 /**
+ * Posts the accounting entry when goods are received from a purchase order.
+ *
+ * Entry:
+ *   DR  Inventory (1200)       — goods received into stock
+ *   CR  Accounts Payable (2000) — liability to the supplier
+ */
+export async function postPurchaseReceiptJournalEntry(
+  tx: DbOrTx,
+  po: { date: Date; id: string; totalCost: string },
+  userId: string
+) {
+  const amount = Number(po.totalCost);
+  if (amount <= 0) {
+    return;
+  }
+
+  const acctRows = await tx
+    .select({ code: accounts.code, id: accounts.id })
+    .from(accounts)
+    .where(inArray(accounts.code, ["1200", "2000"]));
+
+  if (acctRows.length < 2) {
+    return;
+  } // accounts not seeded — skip silently
+
+  const byCode: Record<string, string> = {};
+  for (const r of acctRows) {
+    byCode[r.code] = r.id;
+  }
+
+  const [period] = await tx
+    .select({ id: accountingPeriods.id })
+    .from(accountingPeriods)
+    .where(
+      and(
+        eq(accountingPeriods.status, "open"),
+        lte(accountingPeriods.startDate, po.date),
+        gte(accountingPeriods.endDate, po.date)
+      )
+    )
+    .limit(1);
+
+  const entryNumber = makeEntryNumber("JE");
+
+  const [entry] = await tx
+    .insert(journalEntries)
+    .values({
+      createdBy: userId,
+      date: po.date,
+      description: "Purchase Order Receipt",
+      entryNumber,
+      periodId: period?.id ?? null,
+      postedAt: new Date(),
+      sourceId: po.id,
+      sourceType: "purchase_order",
+      status: "posted",
+      totalCredit: amount.toString(),
+      totalDebit: amount.toString(),
+    })
+    .returning({ id: journalEntries.id });
+
+  const lines: {
+    accountId: string;
+    amount: string;
+    description: null;
+    entryId: string;
+    type: "credit" | "debit";
+  }[] = [
+    {
+      accountId: byCode["1200"]!,
+      amount: amount.toString(),
+      description: null,
+      entryId: entry!.id,
+      type: "debit",
+    },
+    {
+      accountId: byCode["2000"]!,
+      amount: amount.toString(),
+      description: null,
+      entryId: entry!.id,
+      type: "credit",
+    },
+  ];
+
+  await tx.insert(journalEntryLines).values(lines);
+  await updateAccountBalances(
+    tx,
+    lines.map((l) => ({
+      accountId: l.accountId,
+      amount: l.amount,
+      type: l.type,
+    }))
+  );
+}
+
+/**
+ * Posts the accounting entry when a PO payment is made.
+ *
+ * Entry:
+ *   DR  Accounts Payable (2000) — liability reduced
+ *   CR  Cash (1000)             — cash disbursed to supplier
+ */
+export async function postPurchasePaymentJournalEntry(
+  tx: DbOrTx,
+  payment: { amount: string; date: Date; poId: string },
+  userId: string
+): Promise<void> {
+  const amount = Number(payment.amount);
+  if (amount <= 0) {
+    return;
+  }
+
+  const acctRows = await tx
+    .select({ code: accounts.code, id: accounts.id })
+    .from(accounts)
+    .where(inArray(accounts.code, ["1000", "2000"]));
+
+  if (acctRows.length < 2) {
+    return; // accounts not seeded — skip silently
+  }
+
+  const byCode: Record<string, string> = {};
+  for (const r of acctRows) {
+    byCode[r.code] = r.id;
+  }
+
+  const [period] = await tx
+    .select({ id: accountingPeriods.id })
+    .from(accountingPeriods)
+    .where(
+      and(
+        eq(accountingPeriods.status, "open"),
+        lte(accountingPeriods.startDate, payment.date),
+        gte(accountingPeriods.endDate, payment.date)
+      )
+    )
+    .limit(1);
+
+  const entryNumber = makeEntryNumber("JE");
+
+  const [entry] = await tx
+    .insert(journalEntries)
+    .values({
+      createdBy: userId,
+      date: payment.date,
+      description: "Purchase Order Payment",
+      entryNumber,
+      periodId: period?.id ?? null,
+      postedAt: new Date(),
+      sourceId: payment.poId,
+      sourceType: "purchase_order",
+      status: "posted",
+      totalCredit: amount.toString(),
+      totalDebit: amount.toString(),
+    })
+    .returning({ id: journalEntries.id });
+
+  const lines: {
+    accountId: string;
+    amount: string;
+    description: null;
+    entryId: string;
+    type: "credit" | "debit";
+  }[] = [
+    {
+      accountId: byCode["2000"]!,
+      amount: amount.toString(),
+      description: null,
+      entryId: entry!.id,
+      type: "debit",
+    },
+    {
+      accountId: byCode["1000"]!,
+      amount: amount.toString(),
+      description: null,
+      entryId: entry!.id,
+      type: "credit",
+    },
+  ];
+
+  await tx.insert(journalEntryLines).values(lines);
+  await updateAccountBalances(
+    tx,
+    lines.map((l) => ({
+      accountId: l.accountId,
+      amount: l.amount,
+      type: l.type,
+    }))
+  );
+}
+
+/**
+ * Posts the reversal accounting entry for a POS return.
+ *
+ * Entry (mirrors the original sale in reverse):
+ *   DR  Revenue (4000)          — revenue reversed proportionally
+ *   DR  Sales Tax Payable (2100) — tax reversed proportionally
+ *   CR  Cash (1000)             — cash refunded to customer
+ */
+export async function postReturnJournalEntry(
+  tx: DbOrTx,
+  ret: {
+    date: Date;
+    id: string;
+    originalSaleTax: string;
+    originalSaleTotal: string;
+    totalRefundAmount: string;
+  },
+  userId: string
+) {
+  const refund = Number(ret.totalRefundAmount);
+  if (refund <= 0) {
+    return;
+  }
+
+  const acctRows = await tx
+    .select({ code: accounts.code, id: accounts.id })
+    .from(accounts)
+    .where(inArray(accounts.code, ["1000", "4000", "2100"]));
+
+  if (acctRows.length < 3) {
+    return; // required accounts not seeded — skip silently
+  }
+
+  const byCode: Record<string, string> = {};
+  for (const r of acctRows) {
+    byCode[r.code] = r.id;
+  }
+
+  const [period] = await tx
+    .select({ id: accountingPeriods.id })
+    .from(accountingPeriods)
+    .where(
+      and(
+        eq(accountingPeriods.status, "open"),
+        lte(accountingPeriods.startDate, ret.date),
+        gte(accountingPeriods.endDate, ret.date)
+      )
+    )
+    .limit(1);
+
+  const entryNumber = makeEntryNumber("RET");
+
+  const saleTotal = Number(ret.originalSaleTotal);
+  const taxFraction =
+    saleTotal > 0 ? Number(ret.originalSaleTax) / saleTotal : 0;
+  const taxPortion = +(refund * taxFraction).toFixed(2);
+  const revenuePortion = +(refund - taxPortion).toFixed(2);
+
+  const [entry] = await tx
+    .insert(journalEntries)
+    .values({
+      createdBy: userId,
+      date: ret.date,
+      description: "POS Return",
+      entryNumber,
+      periodId: period?.id ?? null,
+      postedAt: new Date(),
+      sourceId: ret.id,
+      sourceType: "return",
+      status: "posted",
+      totalCredit: refund.toString(),
+      totalDebit: refund.toString(),
+    })
+    .returning({ id: journalEntries.id });
+
+  const linesToInsert: {
+    accountId: string;
+    amount: string;
+    description: string | null;
+    entryId: string;
+    type: "credit" | "debit";
+  }[] = [];
+
+  if (revenuePortion > 0) {
+    linesToInsert.push({
+      accountId: byCode["4000"]!,
+      amount: revenuePortion.toString(),
+      description: null,
+      entryId: entry!.id,
+      type: "debit",
+    });
+  }
+
+  if (taxPortion > 0) {
+    linesToInsert.push({
+      accountId: byCode["2100"]!,
+      amount: taxPortion.toString(),
+      description: null,
+      entryId: entry!.id,
+      type: "debit",
+    });
+  }
+
+  linesToInsert.push({
+    accountId: byCode["1000"]!,
+    amount: refund.toString(),
+    description: null,
+    entryId: entry!.id,
+    type: "credit",
+  });
+
+  await tx.insert(journalEntryLines).values(linesToInsert);
+  await updateAccountBalances(
+    tx,
+    linesToInsert.map((l) => ({
+      accountId: l.accountId,
+      amount: l.amount,
+      type: l.type,
+    }))
+  );
+}
+
+/**
  * Posts the accounting entry when a customer pays off their outstanding
  * due balance alongside (or separately from) a sale.
  *
@@ -248,10 +575,7 @@ export async function postDueCollectionJournalEntry(
     )
     .limit(1);
 
-  const [countRow] = await tx
-    .select({ count: sql<number>`count(*)` })
-    .from(journalEntries);
-  const entryNumber = `JE-${String((countRow?.count ?? 0) + 1).padStart(5, "0")}`;
+  const entryNumber = makeEntryNumber("JE");
 
   const amount = Number(collection.amount);
   // store_credit reduces that liability; everything else hits Cash
@@ -622,10 +946,7 @@ export const accountingRouter = {
             )
             .limit(1);
 
-          const [countRow] = await tx
-            .select({ count: sql<number>`count(*)` })
-            .from(expenses);
-          const expenseNumber = `EXP-${String((countRow?.count ?? 0) + 1).padStart(5, "0")}`;
+          const expenseNumber = makeEntryNumber("EXP");
 
           const [expense] = await tx
             .insert(expenses)
@@ -643,10 +964,7 @@ export const accountingRouter = {
             })
             .returning();
 
-          const [jeCountRow] = await tx
-            .select({ count: sql<number>`count(*)` })
-            .from(journalEntries);
-          const entryNumber = `JE-${String((jeCountRow?.count ?? 0) + 1).padStart(5, "0")}`;
+          const entryNumber = makeEntryNumber("JE");
 
           const amt = Number(input.amount);
 
@@ -1095,10 +1413,7 @@ export const accountingRouter = {
             )
             .limit(1);
 
-          const [countRow] = await tx
-            .select({ count: sql<number>`count(*)` })
-            .from(journalEntries);
-          const entryNumber = `JE-${String((countRow?.count ?? 0) + 1).padStart(5, "0")}`;
+          const entryNumber = makeEntryNumber("JE");
 
           const [entry] = await tx
             .insert(journalEntries)

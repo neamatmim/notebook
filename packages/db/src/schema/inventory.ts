@@ -62,6 +62,7 @@ export const suppliers = pgTable("suppliers", {
   name: text("name").notNull(),
   notes: text("notes"),
   paymentTerms: text("payment_terms"),
+  paymentTermsDays: integer("payment_terms_days"),
   phone: text("phone"),
   state: text("state"),
   status: supplierStatusEnum("status").default("active"),
@@ -237,6 +238,11 @@ export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", [
   "cancelled",
 ]);
 
+export const purchaseOrderPaymentStatusEnum = pgEnum(
+  "purchase_order_payment_status",
+  ["unpaid", "partially_paid", "paid", "overdue"]
+);
+
 export const purchaseOrders = pgTable("purchase_orders", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   createdBy: text("created_by"),
@@ -249,6 +255,14 @@ export const purchaseOrders = pgTable("purchase_orders", {
   shippingCost: decimal("shipping_cost", { precision: 12, scale: 2 }).default(
     "0"
   ),
+  amountPaid: decimal("amount_paid", { precision: 12, scale: 2 })
+    .default("0")
+    .notNull(),
+  paidAt: timestamp("paid_at"),
+  paymentDueDate: timestamp("payment_due_date"),
+  paymentStatus: purchaseOrderPaymentStatusEnum("payment_status")
+    .default("unpaid")
+    .notNull(),
   status: purchaseOrderStatusEnum("status").default("draft"),
   subtotal: decimal("subtotal", { precision: 12, scale: 2 }).default("0"),
   supplierId: uuid("supplier_id").notNull(),
@@ -263,12 +277,31 @@ export const purchaseOrdersRelations = relations(
   purchaseOrders,
   ({ one, many }) => ({
     items: many(purchaseOrderItems),
+    payments: many(poPayments),
     supplier: one(suppliers, {
       fields: [purchaseOrders.supplierId],
       references: [suppliers.id],
     }),
   })
 );
+
+export const poPayments = pgTable("po_payments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  purchaseOrderId: uuid("purchase_order_id").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  paymentMethod: text("payment_method"),
+  paymentDate: timestamp("payment_date").notNull(),
+  notes: text("notes"),
+  journalEntryId: uuid("journal_entry_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const poPaymentsRelations = relations(poPayments, ({ one }) => ({
+  purchaseOrder: one(purchaseOrders, {
+    fields: [poPayments.purchaseOrderId],
+    references: [purchaseOrders.id],
+  }),
+}));
 
 export const purchaseOrderItems = pgTable("purchase_order_items", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -300,3 +333,33 @@ export const purchaseOrderItemsRelations = relations(
     }),
   })
 );
+
+export const costUpdateMethodEnum = pgEnum("cost_update_method", [
+  "none",
+  "last_cost",
+  "weighted_average",
+  "fifo",
+]);
+
+export const inventorySettings = pgTable("inventory_settings", {
+  costUpdateMethod: costUpdateMethodEnum("cost_update_method")
+    .default("none")
+    .notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  id: text("id").primaryKey().default("default"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const costLayers = pgTable("cost_layers", {
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  locationId: uuid("location_id"),
+  originalQuantity: integer("original_quantity").notNull(),
+  productId: uuid("product_id").notNull(),
+  receivedAt: timestamp("received_at").defaultNow().notNull(),
+  referenceId: uuid("reference_id"),
+  referenceType: text("reference_type"),
+  remainingQuantity: integer("remaining_quantity").notNull(),
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }).notNull(),
+  variantId: uuid("variant_id"),
+});

@@ -1,7 +1,10 @@
 import { db } from "@notebook/db";
 import {
   categories,
+  costLayers,
+  inventorySettings,
   locations,
+  poPayments,
   products,
   productVariants,
   purchaseOrderItems,
@@ -11,10 +14,48 @@ import {
   suppliers,
 } from "@notebook/db/schema";
 import { ORPCError } from "@orpc/server";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql, sum } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure } from "../index";
+import {
+  postPurchasePaymentJournalEntry,
+  postPurchaseReceiptJournalEntry,
+} from "./accounting";
+
+function resolvePaymentStatus(
+  paymentStatus: "unpaid" | "partially_paid" | "paid" | "overdue" | null,
+  paymentDueDate: Date | null
+): "unpaid" | "partially_paid" | "paid" | "overdue" {
+  const status = paymentStatus ?? "unpaid";
+  if (
+    status === "unpaid" &&
+    paymentDueDate &&
+    new Date(paymentDueDate) < new Date()
+  ) {
+    return "overdue";
+  }
+  return status;
+}
+
+function computePaymentDueDate(
+  orderDate: Date,
+  paymentTermsDays: number | null | undefined
+): Date | undefined {
+  if (
+    paymentTermsDays === null ||
+    paymentTermsDays === undefined ||
+    paymentTermsDays < 0
+  ) {
+    return undefined;
+  }
+  if (paymentTermsDays === 0) {
+    return orderDate;
+  }
+  const due = new Date(orderDate);
+  due.setDate(due.getDate() + paymentTermsDays);
+  return due;
+}
 
 const createCategorySchema = z.object({
   description: z.string().optional(),
@@ -33,6 +74,7 @@ const createSupplierSchema = z.object({
   name: z.string().min(1),
   notes: z.string().optional(),
   paymentTerms: z.string().optional(),
+  paymentTermsDays: z.number().int().min(0).optional(),
   phone: z.string().optional(),
   state: z.string().optional(),
   taxId: z.string().optional(),
@@ -543,6 +585,22 @@ export const inventoryRouter = {
       return locations_data;
     }),
 
+    delete: protectedProcedure
+      .input(z.object({ id: z.string().uuid() }))
+      .handler(async ({ input }) => {
+        const [location] = await db
+          .update(locations)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(and(eq(locations.id, input.id), eq(locations.isActive, true)))
+          .returning();
+
+        if (!location) {
+          throw new ORPCError("NOT_FOUND", { message: "Location not found" });
+        }
+
+        return location;
+      }),
+
     update: protectedProcedure
       .input(updateLocationSchema)
       .handler(async ({ input }) => {
@@ -559,6 +617,44 @@ export const inventoryRouter = {
         }
 
         return location;
+      }),
+  },
+
+  // Inventory Settings
+  settings: {
+    get: protectedProcedure.handler(async () => {
+      const [row] = await db
+        .select()
+        .from(inventorySettings)
+        .where(eq(inventorySettings.id, "default"))
+        .limit(1);
+      return row ?? { costUpdateMethod: "none" as const, id: "default" };
+    }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          costUpdateMethod: z.enum([
+            "none",
+            "last_cost",
+            "weighted_average",
+            "fifo",
+          ]),
+        })
+      )
+      .handler(async ({ input }) => {
+        const [row] = await db
+          .insert(inventorySettings)
+          .values({ costUpdateMethod: input.costUpdateMethod, id: "default" })
+          .onConflictDoUpdate({
+            set: {
+              costUpdateMethod: input.costUpdateMethod,
+              updatedAt: new Date(),
+            },
+            target: inventorySettings.id,
+          })
+          .returning();
+        return row;
       }),
   },
 
@@ -709,6 +805,18 @@ export const inventoryRouter = {
             subtotal += Number(item.unitCost) * item.quantity;
           }
 
+          const [sup] = await tx
+            .select({ paymentTermsDays: suppliers.paymentTermsDays })
+            .from(suppliers)
+            .where(eq(suppliers.id, input.supplierId))
+            .limit(1);
+
+          const orderDate = new Date();
+          const paymentDueDate = computePaymentDueDate(
+            orderDate,
+            sup?.paymentTermsDays
+          );
+
           const [order] = await tx
             .insert(purchaseOrders)
             .values({
@@ -717,6 +825,7 @@ export const inventoryRouter = {
                 ? new Date(input.expectedDate)
                 : undefined,
               notes: input.notes,
+              paymentDueDate: paymentDueDate ?? null,
               poNumber,
               subtotal: subtotal.toString(),
               supplierId: input.supplierId,
@@ -745,10 +854,14 @@ export const inventoryRouter = {
       .handler(async ({ input }) => {
         const [order] = await db
           .select({
+            amountPaid: purchaseOrders.amountPaid,
             expectedDate: purchaseOrders.expectedDate,
             id: purchaseOrders.id,
             notes: purchaseOrders.notes,
             orderDate: purchaseOrders.orderDate,
+            paidAt: purchaseOrders.paidAt,
+            paymentDueDate: purchaseOrders.paymentDueDate,
+            paymentStatus: purchaseOrders.paymentStatus,
             poNumber: purchaseOrders.poNumber,
             receivedDate: purchaseOrders.receivedDate,
             shippingCost: purchaseOrders.shippingCost,
@@ -758,6 +871,8 @@ export const inventoryRouter = {
               email: suppliers.email,
               id: suppliers.id,
               name: suppliers.name,
+              paymentTerms: suppliers.paymentTerms,
+              paymentTermsDays: suppliers.paymentTermsDays,
               phone: suppliers.phone,
             },
             taxAmount: purchaseOrders.taxAmount,
@@ -798,7 +913,21 @@ export const inventoryRouter = {
           )
           .where(eq(purchaseOrderItems.purchaseOrderId, input.id));
 
-        return { ...order, items };
+        const payments = await db
+          .select()
+          .from(poPayments)
+          .where(eq(poPayments.purchaseOrderId, input.id))
+          .orderBy(asc(poPayments.paymentDate));
+
+        return {
+          ...order,
+          items,
+          payments,
+          paymentStatus: resolvePaymentStatus(
+            order.paymentStatus,
+            order.paymentDueDate
+          ),
+        };
       }),
 
     list: protectedProcedure
@@ -810,6 +939,8 @@ export const inventoryRouter = {
               expectedDate: purchaseOrders.expectedDate,
               id: purchaseOrders.id,
               orderDate: purchaseOrders.orderDate,
+              paymentDueDate: purchaseOrders.paymentDueDate,
+              paymentStatus: purchaseOrders.paymentStatus,
               poNumber: purchaseOrders.poNumber,
               status: purchaseOrders.status,
               supplier: {
@@ -827,7 +958,13 @@ export const inventoryRouter = {
         ]);
 
         return {
-          items,
+          items: items.map((item) => ({
+            ...item,
+            paymentStatus: resolvePaymentStatus(
+              item.paymentStatus,
+              item.paymentDueDate
+            ),
+          })),
           pagination: {
             limit: input.limit,
             offset: input.offset,
@@ -841,100 +978,311 @@ export const inventoryRouter = {
         z.object({
           id: z.string().uuid(),
           items: receivePurchaseOrderSchema.shape.items,
+          locationId: z.string().uuid().optional(),
         })
       )
-      .handler(
-        async ({ input, context }) =>
-          await db.transaction(async (tx) => {
-            for (const item of input.items) {
-              const [orderItem] = await tx
-                .select()
-                .from(purchaseOrderItems)
-                .where(eq(purchaseOrderItems.id, item.itemId))
-                .limit(1);
+      .handler(async ({ input, context }) => {
+        const receivedDate = new Date();
+        const result = await db.transaction(async (tx) => {
+          const [invSettings] = await tx
+            .select()
+            .from(inventorySettings)
+            .where(eq(inventorySettings.id, "default"))
+            .limit(1);
+          const costMethod = invSettings?.costUpdateMethod ?? "none";
 
-              if (!orderItem) {
-                throw new ORPCError("NOT_FOUND", {
-                  message: `Purchase order item ${item.itemId} not found`,
-                });
-              }
+          const [poSupplier] = await tx
+            .select({ paymentTermsDays: suppliers.paymentTermsDays })
+            .from(purchaseOrders)
+            .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+            .where(eq(purchaseOrders.id, input.id))
+            .limit(1);
 
-              await tx
-                .update(purchaseOrderItems)
-                .set({
-                  receivedQuantity:
-                    (orderItem.receivedQuantity ?? 0) + item.receivedQuantity,
-                  updatedAt: new Date(),
-                })
-                .where(eq(purchaseOrderItems.id, item.itemId));
+          let totalCost = 0;
 
-              if (item.receivedQuantity > 0) {
-                const stockLevel = await tx
-                  .select()
-                  .from(stockLevels)
-                  .where(
-                    and(
-                      eq(stockLevels.productId, orderItem.productId),
-                      orderItem.variantId
-                        ? eq(stockLevels.variantId, orderItem.variantId)
-                        : sql`${stockLevels.variantId} IS NULL`
-                    )
-                  )
-                  .limit(1);
+          for (const item of input.items) {
+            const [orderItem] = await tx
+              .select()
+              .from(purchaseOrderItems)
+              .where(eq(purchaseOrderItems.id, item.itemId))
+              .limit(1);
 
-                const currentQuantity = stockLevel[0]?.quantity ?? 0;
-                const newQuantity = currentQuantity + item.receivedQuantity;
+            if (!orderItem) {
+              throw new ORPCError("NOT_FOUND", {
+                message: `Purchase order item ${item.itemId} not found`,
+              });
+            }
 
-                if (stockLevel.length > 0) {
-                  await tx
-                    .update(stockLevels)
-                    .set({
-                      availableQuantity: newQuantity,
-                      lastMovementAt: new Date(),
-                      quantity: newQuantity,
-                      updatedAt: new Date(),
-                    })
-                    .where(eq(stockLevels.id, stockLevel[0]!.id));
-                } else {
-                  await tx.insert(stockLevels).values({
-                    availableQuantity: newQuantity,
-                    lastMovementAt: new Date(),
-                    productId: orderItem.productId,
-                    quantity: newQuantity,
-                    variantId: orderItem.variantId,
-                  });
-                }
-
-                await tx.insert(stockMovements).values({
-                  newQuantity,
-                  previousQuantity: currentQuantity,
-                  productId: orderItem.productId,
-                  quantity: item.receivedQuantity,
-                  reason: "Purchase order receipt",
-                  referenceId: input.id,
-                  referenceType: "purchase_order",
-                  totalCost: (
-                    Number(orderItem.unitCost) * item.receivedQuantity
-                  ).toString(),
-                  type: "purchase",
-                  unitCost: orderItem.unitCost,
-                  userId: context.session.user.id,
-                  variantId: orderItem.variantId,
-                });
-              }
+            const remaining =
+              orderItem.quantity - (orderItem.receivedQuantity ?? 0);
+            if (item.receivedQuantity > remaining) {
+              throw new ORPCError("BAD_REQUEST", {
+                message: `Cannot receive ${item.receivedQuantity} units — only ${remaining} remaining on this order line`,
+              });
             }
 
             await tx
-              .update(purchaseOrders)
+              .update(purchaseOrderItems)
               .set({
-                receivedDate: new Date(),
-                status: "received",
+                receivedQuantity:
+                  (orderItem.receivedQuantity ?? 0) + item.receivedQuantity,
                 updatedAt: new Date(),
               })
-              .where(eq(purchaseOrders.id, input.id));
+              .where(eq(purchaseOrderItems.id, item.itemId));
 
-            return { success: true };
-          })
-      ),
+            if (item.receivedQuantity > 0) {
+              totalCost += Number(orderItem.unitCost) * item.receivedQuantity;
+
+              const stockLevel = await tx
+                .select()
+                .from(stockLevels)
+                .where(
+                  and(
+                    eq(stockLevels.productId, orderItem.productId),
+                    orderItem.variantId
+                      ? eq(stockLevels.variantId, orderItem.variantId)
+                      : sql`${stockLevels.variantId} IS NULL`,
+                    input.locationId
+                      ? eq(stockLevels.locationId, input.locationId)
+                      : sql`${stockLevels.locationId} IS NULL`
+                  )
+                )
+                .limit(1);
+
+              const currentQuantity = stockLevel[0]?.quantity ?? 0;
+              const newQuantity = currentQuantity + item.receivedQuantity;
+
+              if (stockLevel.length > 0) {
+                await tx
+                  .update(stockLevels)
+                  .set({
+                    availableQuantity: newQuantity,
+                    lastMovementAt: new Date(),
+                    quantity: newQuantity,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(stockLevels.id, stockLevel[0]!.id));
+              } else {
+                await tx.insert(stockLevels).values({
+                  availableQuantity: newQuantity,
+                  lastMovementAt: new Date(),
+                  locationId: input.locationId ?? null,
+                  productId: orderItem.productId,
+                  quantity: newQuantity,
+                  variantId: orderItem.variantId,
+                });
+              }
+
+              if (costMethod !== "none") {
+                let newCostPrice: string | null = null;
+
+                if (costMethod === "last_cost") {
+                  newCostPrice = orderItem.unitCost;
+                } else if (costMethod === "weighted_average") {
+                  let existingCostPrice = "0";
+                  if (orderItem.variantId) {
+                    const [variant] = await tx
+                      .select({ costPrice: productVariants.costPrice })
+                      .from(productVariants)
+                      .where(eq(productVariants.id, orderItem.variantId))
+                      .limit(1);
+                    existingCostPrice = variant?.costPrice ?? "0";
+                  } else {
+                    const [product] = await tx
+                      .select({ costPrice: products.costPrice })
+                      .from(products)
+                      .where(eq(products.id, orderItem.productId))
+                      .limit(1);
+                    existingCostPrice = product?.costPrice ?? "0";
+                  }
+                  if (newQuantity > 0) {
+                    const weighted =
+                      (currentQuantity * Number(existingCostPrice) +
+                        item.receivedQuantity * Number(orderItem.unitCost)) /
+                      newQuantity;
+                    newCostPrice = weighted.toFixed(4);
+                  }
+                } else if (costMethod === "fifo") {
+                  await tx.insert(costLayers).values({
+                    locationId: input.locationId ?? null,
+                    originalQuantity: item.receivedQuantity,
+                    productId: orderItem.productId,
+                    referenceId: input.id,
+                    referenceType: "purchase_order",
+                    remainingQuantity: item.receivedQuantity,
+                    unitCost: orderItem.unitCost,
+                    variantId: orderItem.variantId,
+                  });
+                  // Cost price = oldest layer still in stock
+                  const [oldest] = await tx
+                    .select({ unitCost: costLayers.unitCost })
+                    .from(costLayers)
+                    .where(
+                      and(
+                        eq(costLayers.productId, orderItem.productId),
+                        orderItem.variantId
+                          ? eq(costLayers.variantId, orderItem.variantId)
+                          : sql`${costLayers.variantId} IS NULL`,
+                        sql`${costLayers.remainingQuantity} > 0`
+                      )
+                    )
+                    .orderBy(asc(costLayers.receivedAt))
+                    .limit(1);
+                  newCostPrice = oldest?.unitCost ?? null;
+                }
+
+                if (newCostPrice !== null) {
+                  if (orderItem.variantId) {
+                    await tx
+                      .update(productVariants)
+                      .set({ costPrice: newCostPrice, updatedAt: new Date() })
+                      .where(eq(productVariants.id, orderItem.variantId));
+                  } else {
+                    await tx
+                      .update(products)
+                      .set({ costPrice: newCostPrice, updatedAt: new Date() })
+                      .where(eq(products.id, orderItem.productId));
+                  }
+                }
+              }
+
+              await tx.insert(stockMovements).values({
+                locationId: input.locationId ?? null,
+                newQuantity,
+                previousQuantity: currentQuantity,
+                productId: orderItem.productId,
+                quantity: item.receivedQuantity,
+                reason: "Purchase order receipt",
+                referenceId: input.id,
+                referenceType: "purchase_order",
+                totalCost: (
+                  Number(orderItem.unitCost) * item.receivedQuantity
+                ).toString(),
+                type: "purchase",
+                unitCost: orderItem.unitCost,
+                userId: context.session.user.id,
+                variantId: orderItem.variantId,
+              });
+            }
+          }
+
+          // Determine if all items are fully received
+          const allItems = await tx
+            .select({
+              quantity: purchaseOrderItems.quantity,
+              receivedQuantity: purchaseOrderItems.receivedQuantity,
+            })
+            .from(purchaseOrderItems)
+            .where(eq(purchaseOrderItems.purchaseOrderId, input.id));
+
+          const allReceived = allItems.every(
+            (i) => (i.receivedQuantity ?? 0) >= i.quantity
+          );
+
+          const isCOD = poSupplier?.paymentTermsDays === 0;
+
+          await tx
+            .update(purchaseOrders)
+            .set({
+              ...(isCOD ? { paymentDueDate: receivedDate } : {}),
+              receivedDate: receivedDate,
+              status: allReceived ? "received" : "partial",
+              updatedAt: new Date(),
+            })
+            .where(eq(purchaseOrders.id, input.id));
+
+          return { success: true, totalCost: totalCost.toString() };
+        });
+
+        try {
+          await postPurchaseReceiptJournalEntry(
+            db,
+            { date: receivedDate, id: input.id, totalCost: result.totalCost },
+            context.session.user.id
+          );
+        } catch {
+          // Accounting not configured — receipt still succeeded
+        }
+
+        return { success: true };
+      }),
+
+    recordPayment: protectedProcedure
+      .input(
+        z.object({
+          amount: z.string(),
+          id: z.string().uuid(),
+          notes: z.string().optional(),
+          paymentDate: z.string().datetime().optional(),
+          paymentMethod: z
+            .enum(["bank_transfer", "check", "cash", "credit_card", "other"])
+            .optional(),
+        })
+      )
+      .handler(async ({ input, context }) => {
+        const paymentDate = input.paymentDate
+          ? new Date(input.paymentDate)
+          : new Date();
+
+        const updatedOrder = await db.transaction(async (tx) => {
+          const [po] = await tx
+            .select({
+              totalAmount: purchaseOrders.totalAmount,
+            })
+            .from(purchaseOrders)
+            .where(eq(purchaseOrders.id, input.id))
+            .limit(1);
+
+          if (!po) {
+            throw new ORPCError("NOT_FOUND", {
+              message: "Purchase order not found",
+            });
+          }
+
+          await tx.insert(poPayments).values({
+            amount: input.amount,
+            notes: input.notes ?? null,
+            paymentDate,
+            paymentMethod: input.paymentMethod ?? null,
+            purchaseOrderId: input.id,
+          });
+
+          const [sumResult] = await tx
+            .select({ total: sum(poPayments.amount) })
+            .from(poPayments)
+            .where(eq(poPayments.purchaseOrderId, input.id));
+
+          const newTotal = sumResult?.total ?? "0";
+          const newStatus =
+            Number(newTotal) >= Number(po.totalAmount)
+              ? ("paid" as const)
+              : ("partially_paid" as const);
+
+          const [order] = await tx
+            .update(purchaseOrders)
+            .set({
+              amountPaid: newTotal,
+              paidAt: paymentDate,
+              paymentStatus: newStatus,
+              updatedAt: new Date(),
+            })
+            .where(eq(purchaseOrders.id, input.id))
+            .returning();
+
+          return order;
+        });
+
+        try {
+          await postPurchasePaymentJournalEntry(
+            db,
+            { amount: input.amount, date: paymentDate, poId: input.id },
+            context.session.user.id
+          );
+        } catch {
+          // Accounting not configured — payment still succeeded
+        }
+
+        return updatedOrder;
+      }),
   },
 };
