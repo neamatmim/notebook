@@ -16,6 +16,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { queryClient, orpc } from "@/utils/orpc";
 
 interface POReceiveDialogProps {
@@ -25,6 +32,12 @@ interface POReceiveDialogProps {
 
 export function POReceiveDialog({ poId, onClose }: POReceiveDialogProps) {
   const [receivedQtys, setReceivedQtys] = useState<Record<string, string>>({});
+  const [locationId, setLocationId] = useState<string>("");
+
+  const locationsQuery = useQuery(
+    orpc.inventory.locations.list.queryOptions({})
+  );
+  const locations = locationsQuery.data ?? [];
 
   const poQuery = useQuery(
     orpc.inventory.purchaseOrders.get.queryOptions({
@@ -39,7 +52,7 @@ export function POReceiveDialog({ poId, onClose }: POReceiveDialogProps) {
     if (po?.items) {
       const defaults: Record<string, string> = {};
       for (const item of po.items) {
-        const remaining = item.quantity - item.receivedQuantity;
+        const remaining = item.quantity - (item.receivedQuantity ?? 0);
         defaults[item.id] = String(Math.max(remaining, 0));
       }
       setReceivedQtys(defaults);
@@ -48,6 +61,7 @@ export function POReceiveDialog({ poId, onClose }: POReceiveDialogProps) {
 
   const receiveMutation = useMutation(
     orpc.inventory.purchaseOrders.receive.mutationOptions({
+      onError: (err) => toast.error(err.message),
       onSuccess: () => {
         toast.success("Purchase order received and stock updated");
         queryClient.invalidateQueries({
@@ -55,8 +69,20 @@ export function POReceiveDialog({ poId, onClose }: POReceiveDialogProps) {
             .queryOptions({ input: {} })
             .queryKey.slice(0, 2),
         });
+        if (poId) {
+          queryClient.invalidateQueries({
+            queryKey: orpc.inventory.purchaseOrders.get
+              .queryOptions({ input: { id: poId } })
+              .queryKey.slice(0, 2),
+          });
+        }
         queryClient.invalidateQueries({
           queryKey: orpc.inventory.stock.movements
+            .queryOptions({ input: {} })
+            .queryKey.slice(0, 2),
+        });
+        queryClient.invalidateQueries({
+          queryKey: orpc.inventory.products.list
             .queryOptions({ input: {} })
             .queryKey.slice(0, 2),
         });
@@ -82,7 +108,11 @@ export function POReceiveDialog({ poId, onClose }: POReceiveDialogProps) {
       return;
     }
 
-    receiveMutation.mutate({ id: poId, items });
+    receiveMutation.mutate({
+      id: poId,
+      items,
+      locationId: locationId || undefined,
+    });
   };
 
   return (
@@ -108,9 +138,27 @@ export function POReceiveDialog({ poId, onClose }: POReceiveDialogProps) {
           </div>
         ) : po ? (
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1">
+              <Label>Destination Location</Label>
+              <Select
+                value={locationId}
+                onValueChange={(v) => setLocationId(v ?? "")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Main warehouse (no location)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.name} ({loc.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-3">
               {po.items.map((item) => {
-                const remaining = item.quantity - item.receivedQuantity;
+                const remaining = item.quantity - (item.receivedQuantity ?? 0);
                 return (
                   <div
                     key={item.id}

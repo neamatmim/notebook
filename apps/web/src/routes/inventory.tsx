@@ -9,6 +9,7 @@ import {
   FolderTree,
   MapPin,
   Package,
+  Settings,
   ShoppingCart,
   TrendingUp,
   Truck,
@@ -32,6 +33,7 @@ const navigation = [
     name: "Stock Movements",
   },
   { href: "/inventory/locations", icon: MapPin, name: "Locations" },
+  { href: "/inventory/settings", icon: Settings, name: "Settings" },
 ] as const;
 
 function InventoryLayout() {

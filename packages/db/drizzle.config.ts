@@ -10,6 +10,7 @@ export default defineConfig({
     url: process.env.DATABASE_URL || "",
   },
   dialect: "postgresql",
+  // casing: "snake_case",
   out: "./src/migrations",
   schema: "./src/schema",
 });

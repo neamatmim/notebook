@@ -19,6 +19,7 @@ import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure } from "../index";
+import { makeEntryNumber, updateAccountBalances } from "./accounting";
 
 function calculateIRR(cashFlows: number[], guess = 0.1): number {
   let rate = guess;
@@ -517,23 +518,81 @@ const investmentsRouter = {
         id: z.string().uuid(),
       })
     )
-    .handler(async ({ input }) => {
-      const [updated] = await db
-        .update(investments)
-        .set({
-          actualReturnAmount: input.actualReturnAmount,
-          exitDate: new Date(input.exitDate),
-          status: "exited",
-          updatedAt: new Date(),
-        })
-        .where(eq(investments.id, input.id))
-        .returning();
+    .handler(async ({ input, context }) =>
+      db.transaction(async (tx) => {
+        const [updated] = await tx
+          .update(investments)
+          .set({
+            actualReturnAmount: input.actualReturnAmount,
+            exitDate: new Date(input.exitDate),
+            status: "exited",
+            updatedAt: new Date(),
+          })
+          .where(eq(investments.id, input.id))
+          .returning();
 
-      if (!updated) {
-        throw new ORPCError("NOT_FOUND", { message: "Investment not found" });
-      }
-      return updated;
-    }),
+        if (!updated) {
+          throw new ORPCError("NOT_FOUND", { message: "Investment not found" });
+        }
+
+        const [project] = await tx
+          .select({
+            accountingAssetAccountId:
+              investmentProjects.accountingAssetAccountId,
+            accountingEquityAccountId:
+              investmentProjects.accountingEquityAccountId,
+          })
+          .from(investmentProjects)
+          .where(eq(investmentProjects.id, updated.projectId))
+          .limit(1);
+
+        if (
+          project?.accountingAssetAccountId &&
+          project.accountingEquityAccountId
+        ) {
+          const userId = context.session?.user?.id ?? "system";
+          const returnAmt = Number(input.actualReturnAmount);
+          const entryNumber = makeEntryNumber("EXIT");
+
+          const [entry] = await tx
+            .insert(journalEntries)
+            .values({
+              createdBy: userId,
+              date: new Date(input.exitDate),
+              description: `Investment exit - return ${input.actualReturnAmount}`,
+              entryNumber,
+              sourceType: "manual",
+              status: "posted",
+              totalCredit: input.actualReturnAmount,
+              totalDebit: input.actualReturnAmount,
+            })
+            .returning();
+
+          if (entry) {
+            const lines = [
+              {
+                accountId: project.accountingEquityAccountId,
+                amount: returnAmt.toString(),
+                description: "Investment exit — equity reduction",
+                entryId: entry.id,
+                type: "debit" as const,
+              },
+              {
+                accountId: project.accountingAssetAccountId,
+                amount: returnAmt.toString(),
+                description: "Investment exit — asset returned",
+                entryId: entry.id,
+                type: "credit" as const,
+              },
+            ];
+            await tx.insert(journalEntryLines).values(lines);
+            await updateAccountBalances(tx, lines);
+          }
+        }
+
+        return updated;
+      })
+    ),
 
   get: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
@@ -668,10 +727,7 @@ const investmentsRouter = {
             project.accountingEquityAccountId
           ) {
             const userId = context.session?.user?.id ?? "system";
-            const [countRow] = await tx
-              .select({ count: sql<number>`count(*)` })
-              .from(journalEntries);
-            const entryNumber = `INV-${String((countRow?.count ?? 0) + 1).padStart(5, "0")}`;
+            const entryNumber = makeEntryNumber("INV");
 
             const [entry] = await tx
               .insert(journalEntries)
@@ -688,22 +744,24 @@ const investmentsRouter = {
               .returning();
 
             if (entry && investment) {
-              await tx.insert(journalEntryLines).values([
+              const lines = [
                 {
                   accountId: project.accountingAssetAccountId,
                   amount: input.amount,
                   description: "Cash received from investor",
                   entryId: entry.id,
-                  type: "debit",
+                  type: "debit" as const,
                 },
                 {
                   accountId: project.accountingEquityAccountId,
                   amount: input.amount,
                   description: "Capital contribution",
                   entryId: entry.id,
-                  type: "credit",
+                  type: "credit" as const,
                 },
-              ]);
+              ];
+              await tx.insert(journalEntryLines).values(lines);
+              await updateAccountBalances(tx, lines);
 
               await tx
                 .update(investments)
@@ -1109,10 +1167,7 @@ const distributionsRouter = {
             project?.accountingRevenueAccountId
           ) {
             const userId = context.session?.user?.id ?? "system";
-            const [countRow] = await tx
-              .select({ count: sql<number>`count(*)` })
-              .from(journalEntries);
-            const entryNumber = `DIST-${String((countRow?.count ?? 0) + 1).padStart(5, "0")}`;
+            const entryNumber = makeEntryNumber("DIST");
 
             const [entry] = await tx
               .insert(journalEntries)
@@ -1129,22 +1184,24 @@ const distributionsRouter = {
               .returning();
 
             if (entry) {
-              await tx.insert(journalEntryLines).values([
+              const lines = [
                 {
                   accountId: project.accountingRevenueAccountId,
                   amount: dist.amount,
                   description: "Returns distributed",
                   entryId: entry.id,
-                  type: "debit",
+                  type: "debit" as const,
                 },
                 {
                   accountId: project.accountingAssetAccountId,
                   amount: dist.amount,
                   description: "Cash paid out",
                   entryId: entry.id,
-                  type: "credit",
+                  type: "credit" as const,
                 },
-              ]);
+              ];
+              await tx.insert(journalEntryLines).values(lines);
+              await updateAccountBalances(tx, lines);
 
               journalEntryId = entry.id;
             }
@@ -1492,10 +1549,7 @@ const shareholdersRouter = {
 
           if (input.cashAccountId && input.shareCapitalAccountId) {
             const userId = context.session?.user?.id ?? "system";
-            const [countRow] = await tx
-              .select({ count: sql<number>`count(*)` })
-              .from(journalEntries);
-            const entryNumber = `SHARE-${String((countRow?.count ?? 0) + 1).padStart(5, "0")}`;
+            const entryNumber = makeEntryNumber("SHARE");
 
             const [entry] = await tx
               .insert(journalEntries)
@@ -1512,22 +1566,24 @@ const shareholdersRouter = {
               .returning();
 
             if (entry && allocation) {
-              await tx.insert(journalEntryLines).values([
+              const lines = [
                 {
                   accountId: input.cashAccountId,
                   amount: totalConsideration,
                   description: "Cash received for shares",
                   entryId: entry.id,
-                  type: "debit",
+                  type: "debit" as const,
                 },
                 {
                   accountId: input.shareCapitalAccountId,
                   amount: totalConsideration,
                   description: "Share capital issued",
                   entryId: entry.id,
-                  type: "credit",
+                  type: "credit" as const,
                 },
-              ]);
+              ];
+              await tx.insert(journalEntryLines).values(lines);
+              await updateAccountBalances(tx, lines);
 
               await tx
                 .update(shareholderAllocations)
@@ -2111,10 +2167,7 @@ const paymentsRouter = {
 
           if (input.cashAccountId && input.contraAccountId) {
             const userId = context.session?.user?.id ?? "system";
-            const [countRow] = await tx
-              .select({ count: sql<number>`count(*)` })
-              .from(journalEntries);
-            const entryNumber = `PAY-${String((countRow?.count ?? 0) + 1).padStart(5, "0")}`;
+            const entryNumber = makeEntryNumber("PAY");
 
             const typeDescriptions: Record<string, string> = {
               capital_call: "Capital call payment",
@@ -2146,7 +2199,7 @@ const paymentsRouter = {
                 payment.type === "capital_call" ||
                 payment.type === "capital_contribution";
 
-              await tx.insert(journalEntryLines).values([
+              const lines = [
                 {
                   accountId: incoming
                     ? input.cashAccountId
@@ -2154,7 +2207,7 @@ const paymentsRouter = {
                   amount: payment.amount,
                   description: incoming ? "Cash received" : "Payment made",
                   entryId: entry.id,
-                  type: "debit",
+                  type: "debit" as const,
                 },
                 {
                   accountId: incoming
@@ -2165,9 +2218,11 @@ const paymentsRouter = {
                     ? "Liability/equity credited"
                     : "Cash paid out",
                   entryId: entry.id,
-                  type: "credit",
+                  type: "credit" as const,
                 },
-              ]);
+              ];
+              await tx.insert(journalEntryLines).values(lines);
+              await updateAccountBalances(tx, lines);
 
               journalEntryId = entry.id;
             }

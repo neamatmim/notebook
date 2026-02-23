@@ -8,784 +8,803 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as PosRouteImport } from './routes/pos'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as InvestmentRouteImport } from './routes/investment'
-import { Route as InventoryRouteImport } from './routes/inventory'
-import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as AccountingRouteImport } from './routes/accounting'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as PosIndexRouteImport } from './routes/pos/index'
-import { Route as InvestmentIndexRouteImport } from './routes/investment/index'
-import { Route as InventoryIndexRouteImport } from './routes/inventory/index'
-import { Route as AccountingIndexRouteImport } from './routes/accounting/index'
-import { Route as PosSalesRouteImport } from './routes/pos/sales'
-import { Route as PosReturnsRouteImport } from './routes/pos/returns'
-import { Route as PosReportsRouteImport } from './routes/pos/reports'
-import { Route as PosGiftCardsRouteImport } from './routes/pos/gift-cards'
-import { Route as PosDiscountsRouteImport } from './routes/pos/discounts'
-import { Route as PosCustomersRouteImport } from './routes/pos/customers'
-import { Route as InvestmentShareholdersRouteImport } from './routes/investment/shareholders'
-import { Route as InvestmentShareClassesRouteImport } from './routes/investment/share-classes'
-import { Route as InvestmentReportsRouteImport } from './routes/investment/reports'
-import { Route as InvestmentProjectsRouteImport } from './routes/investment/projects'
-import { Route as InvestmentPaymentsRouteImport } from './routes/investment/payments'
-import { Route as InvestmentMilestonesRouteImport } from './routes/investment/milestones'
-import { Route as InvestmentInvestorsRouteImport } from './routes/investment/investors'
-import { Route as InvestmentDistributionsRouteImport } from './routes/investment/distributions'
-import { Route as InvestmentCapitalCallsRouteImport } from './routes/investment/capital-calls'
-import { Route as InventorySuppliersRouteImport } from './routes/inventory/suppliers'
-import { Route as InventoryStockMovementsRouteImport } from './routes/inventory/stock-movements'
-import { Route as InventoryPurchaseOrdersRouteImport } from './routes/inventory/purchase-orders'
-import { Route as InventoryProductsRouteImport } from './routes/inventory/products'
-import { Route as InventoryLocationsRouteImport } from './routes/inventory/locations'
-import { Route as InventoryCategoriesRouteImport } from './routes/inventory/categories'
-import { Route as AccountingSettingsRouteImport } from './routes/accounting/settings'
-import { Route as AccountingReportsRouteImport } from './routes/accounting/reports'
-import { Route as AccountingJournalEntriesRouteImport } from './routes/accounting/journal-entries'
-import { Route as AccountingExpensesRouteImport } from './routes/accounting/expenses'
-import { Route as AccountingChartOfAccountsRouteImport } from './routes/accounting/chart-of-accounts'
-import { Route as ApiRpcSplatRouteImport } from './routes/api/rpc/$'
-import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as rootRouteImport } from "./routes/__root";
+import { Route as AccountingRouteImport } from "./routes/accounting";
+import { Route as AccountingChartOfAccountsRouteImport } from "./routes/accounting/chart-of-accounts";
+import { Route as AccountingExpensesRouteImport } from "./routes/accounting/expenses";
+import { Route as AccountingIndexRouteImport } from "./routes/accounting/index";
+import { Route as AccountingJournalEntriesRouteImport } from "./routes/accounting/journal-entries";
+import { Route as AccountingReportsRouteImport } from "./routes/accounting/reports";
+import { Route as AccountingSettingsRouteImport } from "./routes/accounting/settings";
+import { Route as ApiAuthSplatRouteImport } from "./routes/api/auth/$";
+import { Route as ApiRpcSplatRouteImport } from "./routes/api/rpc/$";
+import { Route as DashboardRouteImport } from "./routes/dashboard";
+import { Route as IndexRouteImport } from "./routes/index";
+import { Route as InventoryRouteImport } from "./routes/inventory";
+import { Route as InventoryCategoriesRouteImport } from "./routes/inventory/categories";
+import { Route as InventoryIndexRouteImport } from "./routes/inventory/index";
+import { Route as InventoryLocationsRouteImport } from "./routes/inventory/locations";
+import { Route as InventoryProductsRouteImport } from "./routes/inventory/products";
+import { Route as InventoryPurchaseOrdersRouteImport } from "./routes/inventory/purchase-orders";
+import { Route as InventorySettingsRouteImport } from "./routes/inventory/settings";
+import { Route as InventoryStockMovementsRouteImport } from "./routes/inventory/stock-movements";
+import { Route as InventorySuppliersRouteImport } from "./routes/inventory/suppliers";
+import { Route as InvestmentRouteImport } from "./routes/investment";
+import { Route as InvestmentCapitalCallsRouteImport } from "./routes/investment/capital-calls";
+import { Route as InvestmentDistributionsRouteImport } from "./routes/investment/distributions";
+import { Route as InvestmentIndexRouteImport } from "./routes/investment/index";
+import { Route as InvestmentInvestorsRouteImport } from "./routes/investment/investors";
+import { Route as InvestmentMilestonesRouteImport } from "./routes/investment/milestones";
+import { Route as InvestmentPaymentsRouteImport } from "./routes/investment/payments";
+import { Route as InvestmentProjectsRouteImport } from "./routes/investment/projects";
+import { Route as InvestmentReportsRouteImport } from "./routes/investment/reports";
+import { Route as InvestmentShareClassesRouteImport } from "./routes/investment/share-classes";
+import { Route as InvestmentShareholdersRouteImport } from "./routes/investment/shareholders";
+import { Route as LoginRouteImport } from "./routes/login";
+import { Route as PosRouteImport } from "./routes/pos";
+import { Route as PosCustomersRouteImport } from "./routes/pos/customers";
+import { Route as PosDiscountsRouteImport } from "./routes/pos/discounts";
+import { Route as PosGiftCardsRouteImport } from "./routes/pos/gift-cards";
+import { Route as PosIndexRouteImport } from "./routes/pos/index";
+import { Route as PosReportsRouteImport } from "./routes/pos/reports";
+import { Route as PosReturnsRouteImport } from "./routes/pos/returns";
+import { Route as PosSalesRouteImport } from "./routes/pos/sales";
 
 const PosRoute = PosRouteImport.update({
-  id: '/pos',
-  path: '/pos',
+  id: "/pos",
+  path: "/pos",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+  id: "/login",
+  path: "/login",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const InvestmentRoute = InvestmentRouteImport.update({
-  id: '/investment',
-  path: '/investment',
+  id: "/investment",
+  path: "/investment",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const InventoryRoute = InventoryRouteImport.update({
-  id: '/inventory',
-  path: '/inventory',
+  id: "/inventory",
+  path: "/inventory",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
+  id: "/dashboard",
+  path: "/dashboard",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AccountingRoute = AccountingRouteImport.update({
-  id: '/accounting',
-  path: '/accounting',
+  id: "/accounting",
+  path: "/accounting",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const PosIndexRoute = PosIndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => PosRoute,
-} as any)
+} as any);
 const InvestmentIndexRoute = InvestmentIndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => InvestmentRoute,
-} as any)
+} as any);
 const InventoryIndexRoute = InventoryIndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => InventoryRoute,
-} as any)
+} as any);
 const AccountingIndexRoute = AccountingIndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => AccountingRoute,
-} as any)
+} as any);
 const PosSalesRoute = PosSalesRouteImport.update({
-  id: '/sales',
-  path: '/sales',
+  id: "/sales",
+  path: "/sales",
   getParentRoute: () => PosRoute,
-} as any)
+} as any);
 const PosReturnsRoute = PosReturnsRouteImport.update({
-  id: '/returns',
-  path: '/returns',
+  id: "/returns",
+  path: "/returns",
   getParentRoute: () => PosRoute,
-} as any)
+} as any);
 const PosReportsRoute = PosReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
+  id: "/reports",
+  path: "/reports",
   getParentRoute: () => PosRoute,
-} as any)
+} as any);
 const PosGiftCardsRoute = PosGiftCardsRouteImport.update({
-  id: '/gift-cards',
-  path: '/gift-cards',
+  id: "/gift-cards",
+  path: "/gift-cards",
   getParentRoute: () => PosRoute,
-} as any)
+} as any);
 const PosDiscountsRoute = PosDiscountsRouteImport.update({
-  id: '/discounts',
-  path: '/discounts',
+  id: "/discounts",
+  path: "/discounts",
   getParentRoute: () => PosRoute,
-} as any)
+} as any);
 const PosCustomersRoute = PosCustomersRouteImport.update({
-  id: '/customers',
-  path: '/customers',
+  id: "/customers",
+  path: "/customers",
   getParentRoute: () => PosRoute,
-} as any)
+} as any);
 const InvestmentShareholdersRoute = InvestmentShareholdersRouteImport.update({
-  id: '/shareholders',
-  path: '/shareholders',
+  id: "/shareholders",
+  path: "/shareholders",
   getParentRoute: () => InvestmentRoute,
-} as any)
+} as any);
 const InvestmentShareClassesRoute = InvestmentShareClassesRouteImport.update({
-  id: '/share-classes',
-  path: '/share-classes',
+  id: "/share-classes",
+  path: "/share-classes",
   getParentRoute: () => InvestmentRoute,
-} as any)
+} as any);
 const InvestmentReportsRoute = InvestmentReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
+  id: "/reports",
+  path: "/reports",
   getParentRoute: () => InvestmentRoute,
-} as any)
+} as any);
 const InvestmentProjectsRoute = InvestmentProjectsRouteImport.update({
-  id: '/projects',
-  path: '/projects',
+  id: "/projects",
+  path: "/projects",
   getParentRoute: () => InvestmentRoute,
-} as any)
+} as any);
 const InvestmentPaymentsRoute = InvestmentPaymentsRouteImport.update({
-  id: '/payments',
-  path: '/payments',
+  id: "/payments",
+  path: "/payments",
   getParentRoute: () => InvestmentRoute,
-} as any)
+} as any);
 const InvestmentMilestonesRoute = InvestmentMilestonesRouteImport.update({
-  id: '/milestones',
-  path: '/milestones',
+  id: "/milestones",
+  path: "/milestones",
   getParentRoute: () => InvestmentRoute,
-} as any)
+} as any);
 const InvestmentInvestorsRoute = InvestmentInvestorsRouteImport.update({
-  id: '/investors',
-  path: '/investors',
+  id: "/investors",
+  path: "/investors",
   getParentRoute: () => InvestmentRoute,
-} as any)
+} as any);
 const InvestmentDistributionsRoute = InvestmentDistributionsRouteImport.update({
-  id: '/distributions',
-  path: '/distributions',
+  id: "/distributions",
+  path: "/distributions",
   getParentRoute: () => InvestmentRoute,
-} as any)
+} as any);
 const InvestmentCapitalCallsRoute = InvestmentCapitalCallsRouteImport.update({
-  id: '/capital-calls',
-  path: '/capital-calls',
+  id: "/capital-calls",
+  path: "/capital-calls",
   getParentRoute: () => InvestmentRoute,
-} as any)
+} as any);
 const InventorySuppliersRoute = InventorySuppliersRouteImport.update({
-  id: '/suppliers',
-  path: '/suppliers',
+  id: "/suppliers",
+  path: "/suppliers",
   getParentRoute: () => InventoryRoute,
-} as any)
+} as any);
 const InventoryStockMovementsRoute = InventoryStockMovementsRouteImport.update({
-  id: '/stock-movements',
-  path: '/stock-movements',
+  id: "/stock-movements",
+  path: "/stock-movements",
   getParentRoute: () => InventoryRoute,
-} as any)
+} as any);
+const InventorySettingsRoute = InventorySettingsRouteImport.update({
+  id: "/settings",
+  path: "/settings",
+  getParentRoute: () => InventoryRoute,
+} as any);
 const InventoryPurchaseOrdersRoute = InventoryPurchaseOrdersRouteImport.update({
-  id: '/purchase-orders',
-  path: '/purchase-orders',
+  id: "/purchase-orders",
+  path: "/purchase-orders",
   getParentRoute: () => InventoryRoute,
-} as any)
+} as any);
 const InventoryProductsRoute = InventoryProductsRouteImport.update({
-  id: '/products',
-  path: '/products',
+  id: "/products",
+  path: "/products",
   getParentRoute: () => InventoryRoute,
-} as any)
+} as any);
 const InventoryLocationsRoute = InventoryLocationsRouteImport.update({
-  id: '/locations',
-  path: '/locations',
+  id: "/locations",
+  path: "/locations",
   getParentRoute: () => InventoryRoute,
-} as any)
+} as any);
 const InventoryCategoriesRoute = InventoryCategoriesRouteImport.update({
-  id: '/categories',
-  path: '/categories',
+  id: "/categories",
+  path: "/categories",
   getParentRoute: () => InventoryRoute,
-} as any)
+} as any);
 const AccountingSettingsRoute = AccountingSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+  id: "/settings",
+  path: "/settings",
   getParentRoute: () => AccountingRoute,
-} as any)
+} as any);
 const AccountingReportsRoute = AccountingReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
+  id: "/reports",
+  path: "/reports",
   getParentRoute: () => AccountingRoute,
-} as any)
+} as any);
 const AccountingJournalEntriesRoute =
   AccountingJournalEntriesRouteImport.update({
-    id: '/journal-entries',
-    path: '/journal-entries',
+    id: "/journal-entries",
+    path: "/journal-entries",
     getParentRoute: () => AccountingRoute,
-  } as any)
+  } as any);
 const AccountingExpensesRoute = AccountingExpensesRouteImport.update({
-  id: '/expenses',
-  path: '/expenses',
+  id: "/expenses",
+  path: "/expenses",
   getParentRoute: () => AccountingRoute,
-} as any)
+} as any);
 const AccountingChartOfAccountsRoute =
   AccountingChartOfAccountsRouteImport.update({
-    id: '/chart-of-accounts',
-    path: '/chart-of-accounts',
+    id: "/chart-of-accounts",
+    path: "/chart-of-accounts",
     getParentRoute: () => AccountingRoute,
-  } as any)
+  } as any);
 const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
-  id: '/api/rpc/$',
-  path: '/api/rpc/$',
+  id: "/api/rpc/$",
+  path: "/api/rpc/$",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
+  id: "/api/auth/$",
+  path: "/api/auth/$",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/accounting': typeof AccountingRouteWithChildren
-  '/dashboard': typeof DashboardRoute
-  '/inventory': typeof InventoryRouteWithChildren
-  '/investment': typeof InvestmentRouteWithChildren
-  '/login': typeof LoginRoute
-  '/pos': typeof PosRouteWithChildren
-  '/accounting/chart-of-accounts': typeof AccountingChartOfAccountsRoute
-  '/accounting/expenses': typeof AccountingExpensesRoute
-  '/accounting/journal-entries': typeof AccountingJournalEntriesRoute
-  '/accounting/reports': typeof AccountingReportsRoute
-  '/accounting/settings': typeof AccountingSettingsRoute
-  '/inventory/categories': typeof InventoryCategoriesRoute
-  '/inventory/locations': typeof InventoryLocationsRoute
-  '/inventory/products': typeof InventoryProductsRoute
-  '/inventory/purchase-orders': typeof InventoryPurchaseOrdersRoute
-  '/inventory/stock-movements': typeof InventoryStockMovementsRoute
-  '/inventory/suppliers': typeof InventorySuppliersRoute
-  '/investment/capital-calls': typeof InvestmentCapitalCallsRoute
-  '/investment/distributions': typeof InvestmentDistributionsRoute
-  '/investment/investors': typeof InvestmentInvestorsRoute
-  '/investment/milestones': typeof InvestmentMilestonesRoute
-  '/investment/payments': typeof InvestmentPaymentsRoute
-  '/investment/projects': typeof InvestmentProjectsRoute
-  '/investment/reports': typeof InvestmentReportsRoute
-  '/investment/share-classes': typeof InvestmentShareClassesRoute
-  '/investment/shareholders': typeof InvestmentShareholdersRoute
-  '/pos/customers': typeof PosCustomersRoute
-  '/pos/discounts': typeof PosDiscountsRoute
-  '/pos/gift-cards': typeof PosGiftCardsRoute
-  '/pos/reports': typeof PosReportsRoute
-  '/pos/returns': typeof PosReturnsRoute
-  '/pos/sales': typeof PosSalesRoute
-  '/accounting/': typeof AccountingIndexRoute
-  '/inventory/': typeof InventoryIndexRoute
-  '/investment/': typeof InvestmentIndexRoute
-  '/pos/': typeof PosIndexRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/rpc/$': typeof ApiRpcSplatRoute
+  "/": typeof IndexRoute;
+  "/accounting": typeof AccountingRouteWithChildren;
+  "/dashboard": typeof DashboardRoute;
+  "/inventory": typeof InventoryRouteWithChildren;
+  "/investment": typeof InvestmentRouteWithChildren;
+  "/login": typeof LoginRoute;
+  "/pos": typeof PosRouteWithChildren;
+  "/accounting/chart-of-accounts": typeof AccountingChartOfAccountsRoute;
+  "/accounting/expenses": typeof AccountingExpensesRoute;
+  "/accounting/journal-entries": typeof AccountingJournalEntriesRoute;
+  "/accounting/reports": typeof AccountingReportsRoute;
+  "/accounting/settings": typeof AccountingSettingsRoute;
+  "/inventory/categories": typeof InventoryCategoriesRoute;
+  "/inventory/locations": typeof InventoryLocationsRoute;
+  "/inventory/products": typeof InventoryProductsRoute;
+  "/inventory/purchase-orders": typeof InventoryPurchaseOrdersRoute;
+  "/inventory/settings": typeof InventorySettingsRoute;
+  "/inventory/stock-movements": typeof InventoryStockMovementsRoute;
+  "/inventory/suppliers": typeof InventorySuppliersRoute;
+  "/investment/capital-calls": typeof InvestmentCapitalCallsRoute;
+  "/investment/distributions": typeof InvestmentDistributionsRoute;
+  "/investment/investors": typeof InvestmentInvestorsRoute;
+  "/investment/milestones": typeof InvestmentMilestonesRoute;
+  "/investment/payments": typeof InvestmentPaymentsRoute;
+  "/investment/projects": typeof InvestmentProjectsRoute;
+  "/investment/reports": typeof InvestmentReportsRoute;
+  "/investment/share-classes": typeof InvestmentShareClassesRoute;
+  "/investment/shareholders": typeof InvestmentShareholdersRoute;
+  "/pos/customers": typeof PosCustomersRoute;
+  "/pos/discounts": typeof PosDiscountsRoute;
+  "/pos/gift-cards": typeof PosGiftCardsRoute;
+  "/pos/reports": typeof PosReportsRoute;
+  "/pos/returns": typeof PosReturnsRoute;
+  "/pos/sales": typeof PosSalesRoute;
+  "/accounting/": typeof AccountingIndexRoute;
+  "/inventory/": typeof InventoryIndexRoute;
+  "/investment/": typeof InvestmentIndexRoute;
+  "/pos/": typeof PosIndexRoute;
+  "/api/auth/$": typeof ApiAuthSplatRoute;
+  "/api/rpc/$": typeof ApiRpcSplatRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
-  '/login': typeof LoginRoute
-  '/accounting/chart-of-accounts': typeof AccountingChartOfAccountsRoute
-  '/accounting/expenses': typeof AccountingExpensesRoute
-  '/accounting/journal-entries': typeof AccountingJournalEntriesRoute
-  '/accounting/reports': typeof AccountingReportsRoute
-  '/accounting/settings': typeof AccountingSettingsRoute
-  '/inventory/categories': typeof InventoryCategoriesRoute
-  '/inventory/locations': typeof InventoryLocationsRoute
-  '/inventory/products': typeof InventoryProductsRoute
-  '/inventory/purchase-orders': typeof InventoryPurchaseOrdersRoute
-  '/inventory/stock-movements': typeof InventoryStockMovementsRoute
-  '/inventory/suppliers': typeof InventorySuppliersRoute
-  '/investment/capital-calls': typeof InvestmentCapitalCallsRoute
-  '/investment/distributions': typeof InvestmentDistributionsRoute
-  '/investment/investors': typeof InvestmentInvestorsRoute
-  '/investment/milestones': typeof InvestmentMilestonesRoute
-  '/investment/payments': typeof InvestmentPaymentsRoute
-  '/investment/projects': typeof InvestmentProjectsRoute
-  '/investment/reports': typeof InvestmentReportsRoute
-  '/investment/share-classes': typeof InvestmentShareClassesRoute
-  '/investment/shareholders': typeof InvestmentShareholdersRoute
-  '/pos/customers': typeof PosCustomersRoute
-  '/pos/discounts': typeof PosDiscountsRoute
-  '/pos/gift-cards': typeof PosGiftCardsRoute
-  '/pos/reports': typeof PosReportsRoute
-  '/pos/returns': typeof PosReturnsRoute
-  '/pos/sales': typeof PosSalesRoute
-  '/accounting': typeof AccountingIndexRoute
-  '/inventory': typeof InventoryIndexRoute
-  '/investment': typeof InvestmentIndexRoute
-  '/pos': typeof PosIndexRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/rpc/$': typeof ApiRpcSplatRoute
+  "/": typeof IndexRoute;
+  "/dashboard": typeof DashboardRoute;
+  "/login": typeof LoginRoute;
+  "/accounting/chart-of-accounts": typeof AccountingChartOfAccountsRoute;
+  "/accounting/expenses": typeof AccountingExpensesRoute;
+  "/accounting/journal-entries": typeof AccountingJournalEntriesRoute;
+  "/accounting/reports": typeof AccountingReportsRoute;
+  "/accounting/settings": typeof AccountingSettingsRoute;
+  "/inventory/categories": typeof InventoryCategoriesRoute;
+  "/inventory/locations": typeof InventoryLocationsRoute;
+  "/inventory/products": typeof InventoryProductsRoute;
+  "/inventory/purchase-orders": typeof InventoryPurchaseOrdersRoute;
+  "/inventory/settings": typeof InventorySettingsRoute;
+  "/inventory/stock-movements": typeof InventoryStockMovementsRoute;
+  "/inventory/suppliers": typeof InventorySuppliersRoute;
+  "/investment/capital-calls": typeof InvestmentCapitalCallsRoute;
+  "/investment/distributions": typeof InvestmentDistributionsRoute;
+  "/investment/investors": typeof InvestmentInvestorsRoute;
+  "/investment/milestones": typeof InvestmentMilestonesRoute;
+  "/investment/payments": typeof InvestmentPaymentsRoute;
+  "/investment/projects": typeof InvestmentProjectsRoute;
+  "/investment/reports": typeof InvestmentReportsRoute;
+  "/investment/share-classes": typeof InvestmentShareClassesRoute;
+  "/investment/shareholders": typeof InvestmentShareholdersRoute;
+  "/pos/customers": typeof PosCustomersRoute;
+  "/pos/discounts": typeof PosDiscountsRoute;
+  "/pos/gift-cards": typeof PosGiftCardsRoute;
+  "/pos/reports": typeof PosReportsRoute;
+  "/pos/returns": typeof PosReturnsRoute;
+  "/pos/sales": typeof PosSalesRoute;
+  "/accounting": typeof AccountingIndexRoute;
+  "/inventory": typeof InventoryIndexRoute;
+  "/investment": typeof InvestmentIndexRoute;
+  "/pos": typeof PosIndexRoute;
+  "/api/auth/$": typeof ApiAuthSplatRoute;
+  "/api/rpc/$": typeof ApiRpcSplatRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/accounting': typeof AccountingRouteWithChildren
-  '/dashboard': typeof DashboardRoute
-  '/inventory': typeof InventoryRouteWithChildren
-  '/investment': typeof InvestmentRouteWithChildren
-  '/login': typeof LoginRoute
-  '/pos': typeof PosRouteWithChildren
-  '/accounting/chart-of-accounts': typeof AccountingChartOfAccountsRoute
-  '/accounting/expenses': typeof AccountingExpensesRoute
-  '/accounting/journal-entries': typeof AccountingJournalEntriesRoute
-  '/accounting/reports': typeof AccountingReportsRoute
-  '/accounting/settings': typeof AccountingSettingsRoute
-  '/inventory/categories': typeof InventoryCategoriesRoute
-  '/inventory/locations': typeof InventoryLocationsRoute
-  '/inventory/products': typeof InventoryProductsRoute
-  '/inventory/purchase-orders': typeof InventoryPurchaseOrdersRoute
-  '/inventory/stock-movements': typeof InventoryStockMovementsRoute
-  '/inventory/suppliers': typeof InventorySuppliersRoute
-  '/investment/capital-calls': typeof InvestmentCapitalCallsRoute
-  '/investment/distributions': typeof InvestmentDistributionsRoute
-  '/investment/investors': typeof InvestmentInvestorsRoute
-  '/investment/milestones': typeof InvestmentMilestonesRoute
-  '/investment/payments': typeof InvestmentPaymentsRoute
-  '/investment/projects': typeof InvestmentProjectsRoute
-  '/investment/reports': typeof InvestmentReportsRoute
-  '/investment/share-classes': typeof InvestmentShareClassesRoute
-  '/investment/shareholders': typeof InvestmentShareholdersRoute
-  '/pos/customers': typeof PosCustomersRoute
-  '/pos/discounts': typeof PosDiscountsRoute
-  '/pos/gift-cards': typeof PosGiftCardsRoute
-  '/pos/reports': typeof PosReportsRoute
-  '/pos/returns': typeof PosReturnsRoute
-  '/pos/sales': typeof PosSalesRoute
-  '/accounting/': typeof AccountingIndexRoute
-  '/inventory/': typeof InventoryIndexRoute
-  '/investment/': typeof InvestmentIndexRoute
-  '/pos/': typeof PosIndexRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/rpc/$': typeof ApiRpcSplatRoute
+  __root__: typeof rootRouteImport;
+  "/": typeof IndexRoute;
+  "/accounting": typeof AccountingRouteWithChildren;
+  "/dashboard": typeof DashboardRoute;
+  "/inventory": typeof InventoryRouteWithChildren;
+  "/investment": typeof InvestmentRouteWithChildren;
+  "/login": typeof LoginRoute;
+  "/pos": typeof PosRouteWithChildren;
+  "/accounting/chart-of-accounts": typeof AccountingChartOfAccountsRoute;
+  "/accounting/expenses": typeof AccountingExpensesRoute;
+  "/accounting/journal-entries": typeof AccountingJournalEntriesRoute;
+  "/accounting/reports": typeof AccountingReportsRoute;
+  "/accounting/settings": typeof AccountingSettingsRoute;
+  "/inventory/categories": typeof InventoryCategoriesRoute;
+  "/inventory/locations": typeof InventoryLocationsRoute;
+  "/inventory/products": typeof InventoryProductsRoute;
+  "/inventory/purchase-orders": typeof InventoryPurchaseOrdersRoute;
+  "/inventory/settings": typeof InventorySettingsRoute;
+  "/inventory/stock-movements": typeof InventoryStockMovementsRoute;
+  "/inventory/suppliers": typeof InventorySuppliersRoute;
+  "/investment/capital-calls": typeof InvestmentCapitalCallsRoute;
+  "/investment/distributions": typeof InvestmentDistributionsRoute;
+  "/investment/investors": typeof InvestmentInvestorsRoute;
+  "/investment/milestones": typeof InvestmentMilestonesRoute;
+  "/investment/payments": typeof InvestmentPaymentsRoute;
+  "/investment/projects": typeof InvestmentProjectsRoute;
+  "/investment/reports": typeof InvestmentReportsRoute;
+  "/investment/share-classes": typeof InvestmentShareClassesRoute;
+  "/investment/shareholders": typeof InvestmentShareholdersRoute;
+  "/pos/customers": typeof PosCustomersRoute;
+  "/pos/discounts": typeof PosDiscountsRoute;
+  "/pos/gift-cards": typeof PosGiftCardsRoute;
+  "/pos/reports": typeof PosReportsRoute;
+  "/pos/returns": typeof PosReturnsRoute;
+  "/pos/sales": typeof PosSalesRoute;
+  "/accounting/": typeof AccountingIndexRoute;
+  "/inventory/": typeof InventoryIndexRoute;
+  "/investment/": typeof InvestmentIndexRoute;
+  "/pos/": typeof PosIndexRoute;
+  "/api/auth/$": typeof ApiAuthSplatRoute;
+  "/api/rpc/$": typeof ApiRpcSplatRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
+  fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
-    | '/'
-    | '/accounting'
-    | '/dashboard'
-    | '/inventory'
-    | '/investment'
-    | '/login'
-    | '/pos'
-    | '/accounting/chart-of-accounts'
-    | '/accounting/expenses'
-    | '/accounting/journal-entries'
-    | '/accounting/reports'
-    | '/accounting/settings'
-    | '/inventory/categories'
-    | '/inventory/locations'
-    | '/inventory/products'
-    | '/inventory/purchase-orders'
-    | '/inventory/stock-movements'
-    | '/inventory/suppliers'
-    | '/investment/capital-calls'
-    | '/investment/distributions'
-    | '/investment/investors'
-    | '/investment/milestones'
-    | '/investment/payments'
-    | '/investment/projects'
-    | '/investment/reports'
-    | '/investment/share-classes'
-    | '/investment/shareholders'
-    | '/pos/customers'
-    | '/pos/discounts'
-    | '/pos/gift-cards'
-    | '/pos/reports'
-    | '/pos/returns'
-    | '/pos/sales'
-    | '/accounting/'
-    | '/inventory/'
-    | '/investment/'
-    | '/pos/'
-    | '/api/auth/$'
-    | '/api/rpc/$'
-  fileRoutesByTo: FileRoutesByTo
+    | "/"
+    | "/accounting"
+    | "/dashboard"
+    | "/inventory"
+    | "/investment"
+    | "/login"
+    | "/pos"
+    | "/accounting/chart-of-accounts"
+    | "/accounting/expenses"
+    | "/accounting/journal-entries"
+    | "/accounting/reports"
+    | "/accounting/settings"
+    | "/inventory/categories"
+    | "/inventory/locations"
+    | "/inventory/products"
+    | "/inventory/purchase-orders"
+    | "/inventory/settings"
+    | "/inventory/stock-movements"
+    | "/inventory/suppliers"
+    | "/investment/capital-calls"
+    | "/investment/distributions"
+    | "/investment/investors"
+    | "/investment/milestones"
+    | "/investment/payments"
+    | "/investment/projects"
+    | "/investment/reports"
+    | "/investment/share-classes"
+    | "/investment/shareholders"
+    | "/pos/customers"
+    | "/pos/discounts"
+    | "/pos/gift-cards"
+    | "/pos/reports"
+    | "/pos/returns"
+    | "/pos/sales"
+    | "/accounting/"
+    | "/inventory/"
+    | "/investment/"
+    | "/pos/"
+    | "/api/auth/$"
+    | "/api/rpc/$";
+  fileRoutesByTo: FileRoutesByTo;
   to:
-    | '/'
-    | '/dashboard'
-    | '/login'
-    | '/accounting/chart-of-accounts'
-    | '/accounting/expenses'
-    | '/accounting/journal-entries'
-    | '/accounting/reports'
-    | '/accounting/settings'
-    | '/inventory/categories'
-    | '/inventory/locations'
-    | '/inventory/products'
-    | '/inventory/purchase-orders'
-    | '/inventory/stock-movements'
-    | '/inventory/suppliers'
-    | '/investment/capital-calls'
-    | '/investment/distributions'
-    | '/investment/investors'
-    | '/investment/milestones'
-    | '/investment/payments'
-    | '/investment/projects'
-    | '/investment/reports'
-    | '/investment/share-classes'
-    | '/investment/shareholders'
-    | '/pos/customers'
-    | '/pos/discounts'
-    | '/pos/gift-cards'
-    | '/pos/reports'
-    | '/pos/returns'
-    | '/pos/sales'
-    | '/accounting'
-    | '/inventory'
-    | '/investment'
-    | '/pos'
-    | '/api/auth/$'
-    | '/api/rpc/$'
+    | "/"
+    | "/dashboard"
+    | "/login"
+    | "/accounting/chart-of-accounts"
+    | "/accounting/expenses"
+    | "/accounting/journal-entries"
+    | "/accounting/reports"
+    | "/accounting/settings"
+    | "/inventory/categories"
+    | "/inventory/locations"
+    | "/inventory/products"
+    | "/inventory/purchase-orders"
+    | "/inventory/settings"
+    | "/inventory/stock-movements"
+    | "/inventory/suppliers"
+    | "/investment/capital-calls"
+    | "/investment/distributions"
+    | "/investment/investors"
+    | "/investment/milestones"
+    | "/investment/payments"
+    | "/investment/projects"
+    | "/investment/reports"
+    | "/investment/share-classes"
+    | "/investment/shareholders"
+    | "/pos/customers"
+    | "/pos/discounts"
+    | "/pos/gift-cards"
+    | "/pos/reports"
+    | "/pos/returns"
+    | "/pos/sales"
+    | "/accounting"
+    | "/inventory"
+    | "/investment"
+    | "/pos"
+    | "/api/auth/$"
+    | "/api/rpc/$";
   id:
-    | '__root__'
-    | '/'
-    | '/accounting'
-    | '/dashboard'
-    | '/inventory'
-    | '/investment'
-    | '/login'
-    | '/pos'
-    | '/accounting/chart-of-accounts'
-    | '/accounting/expenses'
-    | '/accounting/journal-entries'
-    | '/accounting/reports'
-    | '/accounting/settings'
-    | '/inventory/categories'
-    | '/inventory/locations'
-    | '/inventory/products'
-    | '/inventory/purchase-orders'
-    | '/inventory/stock-movements'
-    | '/inventory/suppliers'
-    | '/investment/capital-calls'
-    | '/investment/distributions'
-    | '/investment/investors'
-    | '/investment/milestones'
-    | '/investment/payments'
-    | '/investment/projects'
-    | '/investment/reports'
-    | '/investment/share-classes'
-    | '/investment/shareholders'
-    | '/pos/customers'
-    | '/pos/discounts'
-    | '/pos/gift-cards'
-    | '/pos/reports'
-    | '/pos/returns'
-    | '/pos/sales'
-    | '/accounting/'
-    | '/inventory/'
-    | '/investment/'
-    | '/pos/'
-    | '/api/auth/$'
-    | '/api/rpc/$'
-  fileRoutesById: FileRoutesById
+    | "__root__"
+    | "/"
+    | "/accounting"
+    | "/dashboard"
+    | "/inventory"
+    | "/investment"
+    | "/login"
+    | "/pos"
+    | "/accounting/chart-of-accounts"
+    | "/accounting/expenses"
+    | "/accounting/journal-entries"
+    | "/accounting/reports"
+    | "/accounting/settings"
+    | "/inventory/categories"
+    | "/inventory/locations"
+    | "/inventory/products"
+    | "/inventory/purchase-orders"
+    | "/inventory/settings"
+    | "/inventory/stock-movements"
+    | "/inventory/suppliers"
+    | "/investment/capital-calls"
+    | "/investment/distributions"
+    | "/investment/investors"
+    | "/investment/milestones"
+    | "/investment/payments"
+    | "/investment/projects"
+    | "/investment/reports"
+    | "/investment/share-classes"
+    | "/investment/shareholders"
+    | "/pos/customers"
+    | "/pos/discounts"
+    | "/pos/gift-cards"
+    | "/pos/reports"
+    | "/pos/returns"
+    | "/pos/sales"
+    | "/accounting/"
+    | "/inventory/"
+    | "/investment/"
+    | "/pos/"
+    | "/api/auth/$"
+    | "/api/rpc/$";
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  AccountingRoute: typeof AccountingRouteWithChildren
-  DashboardRoute: typeof DashboardRoute
-  InventoryRoute: typeof InventoryRouteWithChildren
-  InvestmentRoute: typeof InvestmentRouteWithChildren
-  LoginRoute: typeof LoginRoute
-  PosRoute: typeof PosRouteWithChildren
-  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
-  ApiRpcSplatRoute: typeof ApiRpcSplatRoute
+  IndexRoute: typeof IndexRoute;
+  AccountingRoute: typeof AccountingRouteWithChildren;
+  DashboardRoute: typeof DashboardRoute;
+  InventoryRoute: typeof InventoryRouteWithChildren;
+  InvestmentRoute: typeof InvestmentRouteWithChildren;
+  LoginRoute: typeof LoginRoute;
+  PosRoute: typeof PosRouteWithChildren;
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
+  ApiRpcSplatRoute: typeof ApiRpcSplatRoute;
 }
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    '/pos': {
-      id: '/pos'
-      path: '/pos'
-      fullPath: '/pos'
-      preLoaderRoute: typeof PosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/investment': {
-      id: '/investment'
-      path: '/investment'
-      fullPath: '/investment'
-      preLoaderRoute: typeof InvestmentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inventory': {
-      id: '/inventory'
-      path: '/inventory'
-      fullPath: '/inventory'
-      preLoaderRoute: typeof InventoryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/accounting': {
-      id: '/accounting'
-      path: '/accounting'
-      fullPath: '/accounting'
-      preLoaderRoute: typeof AccountingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pos/': {
-      id: '/pos/'
-      path: '/'
-      fullPath: '/pos/'
-      preLoaderRoute: typeof PosIndexRouteImport
-      parentRoute: typeof PosRoute
-    }
-    '/investment/': {
-      id: '/investment/'
-      path: '/'
-      fullPath: '/investment/'
-      preLoaderRoute: typeof InvestmentIndexRouteImport
-      parentRoute: typeof InvestmentRoute
-    }
-    '/inventory/': {
-      id: '/inventory/'
-      path: '/'
-      fullPath: '/inventory/'
-      preLoaderRoute: typeof InventoryIndexRouteImport
-      parentRoute: typeof InventoryRoute
-    }
-    '/accounting/': {
-      id: '/accounting/'
-      path: '/'
-      fullPath: '/accounting/'
-      preLoaderRoute: typeof AccountingIndexRouteImport
-      parentRoute: typeof AccountingRoute
-    }
-    '/pos/sales': {
-      id: '/pos/sales'
-      path: '/sales'
-      fullPath: '/pos/sales'
-      preLoaderRoute: typeof PosSalesRouteImport
-      parentRoute: typeof PosRoute
-    }
-    '/pos/returns': {
-      id: '/pos/returns'
-      path: '/returns'
-      fullPath: '/pos/returns'
-      preLoaderRoute: typeof PosReturnsRouteImport
-      parentRoute: typeof PosRoute
-    }
-    '/pos/reports': {
-      id: '/pos/reports'
-      path: '/reports'
-      fullPath: '/pos/reports'
-      preLoaderRoute: typeof PosReportsRouteImport
-      parentRoute: typeof PosRoute
-    }
-    '/pos/gift-cards': {
-      id: '/pos/gift-cards'
-      path: '/gift-cards'
-      fullPath: '/pos/gift-cards'
-      preLoaderRoute: typeof PosGiftCardsRouteImport
-      parentRoute: typeof PosRoute
-    }
-    '/pos/discounts': {
-      id: '/pos/discounts'
-      path: '/discounts'
-      fullPath: '/pos/discounts'
-      preLoaderRoute: typeof PosDiscountsRouteImport
-      parentRoute: typeof PosRoute
-    }
-    '/pos/customers': {
-      id: '/pos/customers'
-      path: '/customers'
-      fullPath: '/pos/customers'
-      preLoaderRoute: typeof PosCustomersRouteImport
-      parentRoute: typeof PosRoute
-    }
-    '/investment/shareholders': {
-      id: '/investment/shareholders'
-      path: '/shareholders'
-      fullPath: '/investment/shareholders'
-      preLoaderRoute: typeof InvestmentShareholdersRouteImport
-      parentRoute: typeof InvestmentRoute
-    }
-    '/investment/share-classes': {
-      id: '/investment/share-classes'
-      path: '/share-classes'
-      fullPath: '/investment/share-classes'
-      preLoaderRoute: typeof InvestmentShareClassesRouteImport
-      parentRoute: typeof InvestmentRoute
-    }
-    '/investment/reports': {
-      id: '/investment/reports'
-      path: '/reports'
-      fullPath: '/investment/reports'
-      preLoaderRoute: typeof InvestmentReportsRouteImport
-      parentRoute: typeof InvestmentRoute
-    }
-    '/investment/projects': {
-      id: '/investment/projects'
-      path: '/projects'
-      fullPath: '/investment/projects'
-      preLoaderRoute: typeof InvestmentProjectsRouteImport
-      parentRoute: typeof InvestmentRoute
-    }
-    '/investment/payments': {
-      id: '/investment/payments'
-      path: '/payments'
-      fullPath: '/investment/payments'
-      preLoaderRoute: typeof InvestmentPaymentsRouteImport
-      parentRoute: typeof InvestmentRoute
-    }
-    '/investment/milestones': {
-      id: '/investment/milestones'
-      path: '/milestones'
-      fullPath: '/investment/milestones'
-      preLoaderRoute: typeof InvestmentMilestonesRouteImport
-      parentRoute: typeof InvestmentRoute
-    }
-    '/investment/investors': {
-      id: '/investment/investors'
-      path: '/investors'
-      fullPath: '/investment/investors'
-      preLoaderRoute: typeof InvestmentInvestorsRouteImport
-      parentRoute: typeof InvestmentRoute
-    }
-    '/investment/distributions': {
-      id: '/investment/distributions'
-      path: '/distributions'
-      fullPath: '/investment/distributions'
-      preLoaderRoute: typeof InvestmentDistributionsRouteImport
-      parentRoute: typeof InvestmentRoute
-    }
-    '/investment/capital-calls': {
-      id: '/investment/capital-calls'
-      path: '/capital-calls'
-      fullPath: '/investment/capital-calls'
-      preLoaderRoute: typeof InvestmentCapitalCallsRouteImport
-      parentRoute: typeof InvestmentRoute
-    }
-    '/inventory/suppliers': {
-      id: '/inventory/suppliers'
-      path: '/suppliers'
-      fullPath: '/inventory/suppliers'
-      preLoaderRoute: typeof InventorySuppliersRouteImport
-      parentRoute: typeof InventoryRoute
-    }
-    '/inventory/stock-movements': {
-      id: '/inventory/stock-movements'
-      path: '/stock-movements'
-      fullPath: '/inventory/stock-movements'
-      preLoaderRoute: typeof InventoryStockMovementsRouteImport
-      parentRoute: typeof InventoryRoute
-    }
-    '/inventory/purchase-orders': {
-      id: '/inventory/purchase-orders'
-      path: '/purchase-orders'
-      fullPath: '/inventory/purchase-orders'
-      preLoaderRoute: typeof InventoryPurchaseOrdersRouteImport
-      parentRoute: typeof InventoryRoute
-    }
-    '/inventory/products': {
-      id: '/inventory/products'
-      path: '/products'
-      fullPath: '/inventory/products'
-      preLoaderRoute: typeof InventoryProductsRouteImport
-      parentRoute: typeof InventoryRoute
-    }
-    '/inventory/locations': {
-      id: '/inventory/locations'
-      path: '/locations'
-      fullPath: '/inventory/locations'
-      preLoaderRoute: typeof InventoryLocationsRouteImport
-      parentRoute: typeof InventoryRoute
-    }
-    '/inventory/categories': {
-      id: '/inventory/categories'
-      path: '/categories'
-      fullPath: '/inventory/categories'
-      preLoaderRoute: typeof InventoryCategoriesRouteImport
-      parentRoute: typeof InventoryRoute
-    }
-    '/accounting/settings': {
-      id: '/accounting/settings'
-      path: '/settings'
-      fullPath: '/accounting/settings'
-      preLoaderRoute: typeof AccountingSettingsRouteImport
-      parentRoute: typeof AccountingRoute
-    }
-    '/accounting/reports': {
-      id: '/accounting/reports'
-      path: '/reports'
-      fullPath: '/accounting/reports'
-      preLoaderRoute: typeof AccountingReportsRouteImport
-      parentRoute: typeof AccountingRoute
-    }
-    '/accounting/journal-entries': {
-      id: '/accounting/journal-entries'
-      path: '/journal-entries'
-      fullPath: '/accounting/journal-entries'
-      preLoaderRoute: typeof AccountingJournalEntriesRouteImport
-      parentRoute: typeof AccountingRoute
-    }
-    '/accounting/expenses': {
-      id: '/accounting/expenses'
-      path: '/expenses'
-      fullPath: '/accounting/expenses'
-      preLoaderRoute: typeof AccountingExpensesRouteImport
-      parentRoute: typeof AccountingRoute
-    }
-    '/accounting/chart-of-accounts': {
-      id: '/accounting/chart-of-accounts'
-      path: '/chart-of-accounts'
-      fullPath: '/accounting/chart-of-accounts'
-      preLoaderRoute: typeof AccountingChartOfAccountsRouteImport
-      parentRoute: typeof AccountingRoute
-    }
-    '/api/rpc/$': {
-      id: '/api/rpc/$'
-      path: '/api/rpc/$'
-      fullPath: '/api/rpc/$'
-      preLoaderRoute: typeof ApiRpcSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+    "/pos": {
+      id: "/pos";
+      path: "/pos";
+      fullPath: "/pos";
+      preLoaderRoute: typeof PosRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/login": {
+      id: "/login";
+      path: "/login";
+      fullPath: "/login";
+      preLoaderRoute: typeof LoginRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/investment": {
+      id: "/investment";
+      path: "/investment";
+      fullPath: "/investment";
+      preLoaderRoute: typeof InvestmentRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/inventory": {
+      id: "/inventory";
+      path: "/inventory";
+      fullPath: "/inventory";
+      preLoaderRoute: typeof InventoryRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/dashboard": {
+      id: "/dashboard";
+      path: "/dashboard";
+      fullPath: "/dashboard";
+      preLoaderRoute: typeof DashboardRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/accounting": {
+      id: "/accounting";
+      path: "/accounting";
+      fullPath: "/accounting";
+      preLoaderRoute: typeof AccountingRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/": {
+      id: "/";
+      path: "/";
+      fullPath: "/";
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/pos/": {
+      id: "/pos/";
+      path: "/";
+      fullPath: "/pos/";
+      preLoaderRoute: typeof PosIndexRouteImport;
+      parentRoute: typeof PosRoute;
+    };
+    "/investment/": {
+      id: "/investment/";
+      path: "/";
+      fullPath: "/investment/";
+      preLoaderRoute: typeof InvestmentIndexRouteImport;
+      parentRoute: typeof InvestmentRoute;
+    };
+    "/inventory/": {
+      id: "/inventory/";
+      path: "/";
+      fullPath: "/inventory/";
+      preLoaderRoute: typeof InventoryIndexRouteImport;
+      parentRoute: typeof InventoryRoute;
+    };
+    "/accounting/": {
+      id: "/accounting/";
+      path: "/";
+      fullPath: "/accounting/";
+      preLoaderRoute: typeof AccountingIndexRouteImport;
+      parentRoute: typeof AccountingRoute;
+    };
+    "/pos/sales": {
+      id: "/pos/sales";
+      path: "/sales";
+      fullPath: "/pos/sales";
+      preLoaderRoute: typeof PosSalesRouteImport;
+      parentRoute: typeof PosRoute;
+    };
+    "/pos/returns": {
+      id: "/pos/returns";
+      path: "/returns";
+      fullPath: "/pos/returns";
+      preLoaderRoute: typeof PosReturnsRouteImport;
+      parentRoute: typeof PosRoute;
+    };
+    "/pos/reports": {
+      id: "/pos/reports";
+      path: "/reports";
+      fullPath: "/pos/reports";
+      preLoaderRoute: typeof PosReportsRouteImport;
+      parentRoute: typeof PosRoute;
+    };
+    "/pos/gift-cards": {
+      id: "/pos/gift-cards";
+      path: "/gift-cards";
+      fullPath: "/pos/gift-cards";
+      preLoaderRoute: typeof PosGiftCardsRouteImport;
+      parentRoute: typeof PosRoute;
+    };
+    "/pos/discounts": {
+      id: "/pos/discounts";
+      path: "/discounts";
+      fullPath: "/pos/discounts";
+      preLoaderRoute: typeof PosDiscountsRouteImport;
+      parentRoute: typeof PosRoute;
+    };
+    "/pos/customers": {
+      id: "/pos/customers";
+      path: "/customers";
+      fullPath: "/pos/customers";
+      preLoaderRoute: typeof PosCustomersRouteImport;
+      parentRoute: typeof PosRoute;
+    };
+    "/investment/shareholders": {
+      id: "/investment/shareholders";
+      path: "/shareholders";
+      fullPath: "/investment/shareholders";
+      preLoaderRoute: typeof InvestmentShareholdersRouteImport;
+      parentRoute: typeof InvestmentRoute;
+    };
+    "/investment/share-classes": {
+      id: "/investment/share-classes";
+      path: "/share-classes";
+      fullPath: "/investment/share-classes";
+      preLoaderRoute: typeof InvestmentShareClassesRouteImport;
+      parentRoute: typeof InvestmentRoute;
+    };
+    "/investment/reports": {
+      id: "/investment/reports";
+      path: "/reports";
+      fullPath: "/investment/reports";
+      preLoaderRoute: typeof InvestmentReportsRouteImport;
+      parentRoute: typeof InvestmentRoute;
+    };
+    "/investment/projects": {
+      id: "/investment/projects";
+      path: "/projects";
+      fullPath: "/investment/projects";
+      preLoaderRoute: typeof InvestmentProjectsRouteImport;
+      parentRoute: typeof InvestmentRoute;
+    };
+    "/investment/payments": {
+      id: "/investment/payments";
+      path: "/payments";
+      fullPath: "/investment/payments";
+      preLoaderRoute: typeof InvestmentPaymentsRouteImport;
+      parentRoute: typeof InvestmentRoute;
+    };
+    "/investment/milestones": {
+      id: "/investment/milestones";
+      path: "/milestones";
+      fullPath: "/investment/milestones";
+      preLoaderRoute: typeof InvestmentMilestonesRouteImport;
+      parentRoute: typeof InvestmentRoute;
+    };
+    "/investment/investors": {
+      id: "/investment/investors";
+      path: "/investors";
+      fullPath: "/investment/investors";
+      preLoaderRoute: typeof InvestmentInvestorsRouteImport;
+      parentRoute: typeof InvestmentRoute;
+    };
+    "/investment/distributions": {
+      id: "/investment/distributions";
+      path: "/distributions";
+      fullPath: "/investment/distributions";
+      preLoaderRoute: typeof InvestmentDistributionsRouteImport;
+      parentRoute: typeof InvestmentRoute;
+    };
+    "/investment/capital-calls": {
+      id: "/investment/capital-calls";
+      path: "/capital-calls";
+      fullPath: "/investment/capital-calls";
+      preLoaderRoute: typeof InvestmentCapitalCallsRouteImport;
+      parentRoute: typeof InvestmentRoute;
+    };
+    "/inventory/suppliers": {
+      id: "/inventory/suppliers";
+      path: "/suppliers";
+      fullPath: "/inventory/suppliers";
+      preLoaderRoute: typeof InventorySuppliersRouteImport;
+      parentRoute: typeof InventoryRoute;
+    };
+    "/inventory/stock-movements": {
+      id: "/inventory/stock-movements";
+      path: "/stock-movements";
+      fullPath: "/inventory/stock-movements";
+      preLoaderRoute: typeof InventoryStockMovementsRouteImport;
+      parentRoute: typeof InventoryRoute;
+    };
+    "/inventory/settings": {
+      id: "/inventory/settings";
+      path: "/settings";
+      fullPath: "/inventory/settings";
+      preLoaderRoute: typeof InventorySettingsRouteImport;
+      parentRoute: typeof InventoryRoute;
+    };
+    "/inventory/purchase-orders": {
+      id: "/inventory/purchase-orders";
+      path: "/purchase-orders";
+      fullPath: "/inventory/purchase-orders";
+      preLoaderRoute: typeof InventoryPurchaseOrdersRouteImport;
+      parentRoute: typeof InventoryRoute;
+    };
+    "/inventory/products": {
+      id: "/inventory/products";
+      path: "/products";
+      fullPath: "/inventory/products";
+      preLoaderRoute: typeof InventoryProductsRouteImport;
+      parentRoute: typeof InventoryRoute;
+    };
+    "/inventory/locations": {
+      id: "/inventory/locations";
+      path: "/locations";
+      fullPath: "/inventory/locations";
+      preLoaderRoute: typeof InventoryLocationsRouteImport;
+      parentRoute: typeof InventoryRoute;
+    };
+    "/inventory/categories": {
+      id: "/inventory/categories";
+      path: "/categories";
+      fullPath: "/inventory/categories";
+      preLoaderRoute: typeof InventoryCategoriesRouteImport;
+      parentRoute: typeof InventoryRoute;
+    };
+    "/accounting/settings": {
+      id: "/accounting/settings";
+      path: "/settings";
+      fullPath: "/accounting/settings";
+      preLoaderRoute: typeof AccountingSettingsRouteImport;
+      parentRoute: typeof AccountingRoute;
+    };
+    "/accounting/reports": {
+      id: "/accounting/reports";
+      path: "/reports";
+      fullPath: "/accounting/reports";
+      preLoaderRoute: typeof AccountingReportsRouteImport;
+      parentRoute: typeof AccountingRoute;
+    };
+    "/accounting/journal-entries": {
+      id: "/accounting/journal-entries";
+      path: "/journal-entries";
+      fullPath: "/accounting/journal-entries";
+      preLoaderRoute: typeof AccountingJournalEntriesRouteImport;
+      parentRoute: typeof AccountingRoute;
+    };
+    "/accounting/expenses": {
+      id: "/accounting/expenses";
+      path: "/expenses";
+      fullPath: "/accounting/expenses";
+      preLoaderRoute: typeof AccountingExpensesRouteImport;
+      parentRoute: typeof AccountingRoute;
+    };
+    "/accounting/chart-of-accounts": {
+      id: "/accounting/chart-of-accounts";
+      path: "/chart-of-accounts";
+      fullPath: "/accounting/chart-of-accounts";
+      preLoaderRoute: typeof AccountingChartOfAccountsRouteImport;
+      parentRoute: typeof AccountingRoute;
+    };
+    "/api/rpc/$": {
+      id: "/api/rpc/$";
+      path: "/api/rpc/$";
+      fullPath: "/api/rpc/$";
+      preLoaderRoute: typeof ApiRpcSplatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/api/auth/$": {
+      id: "/api/auth/$";
+      path: "/api/auth/$";
+      fullPath: "/api/auth/$";
+      preLoaderRoute: typeof ApiAuthSplatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
 interface AccountingRouteChildren {
-  AccountingChartOfAccountsRoute: typeof AccountingChartOfAccountsRoute
-  AccountingExpensesRoute: typeof AccountingExpensesRoute
-  AccountingJournalEntriesRoute: typeof AccountingJournalEntriesRoute
-  AccountingReportsRoute: typeof AccountingReportsRoute
-  AccountingSettingsRoute: typeof AccountingSettingsRoute
-  AccountingIndexRoute: typeof AccountingIndexRoute
+  AccountingChartOfAccountsRoute: typeof AccountingChartOfAccountsRoute;
+  AccountingExpensesRoute: typeof AccountingExpensesRoute;
+  AccountingJournalEntriesRoute: typeof AccountingJournalEntriesRoute;
+  AccountingReportsRoute: typeof AccountingReportsRoute;
+  AccountingSettingsRoute: typeof AccountingSettingsRoute;
+  AccountingIndexRoute: typeof AccountingIndexRoute;
 }
 
 const AccountingRouteChildren: AccountingRouteChildren = {
@@ -795,20 +814,21 @@ const AccountingRouteChildren: AccountingRouteChildren = {
   AccountingReportsRoute: AccountingReportsRoute,
   AccountingSettingsRoute: AccountingSettingsRoute,
   AccountingIndexRoute: AccountingIndexRoute,
-}
+};
 
 const AccountingRouteWithChildren = AccountingRoute._addFileChildren(
-  AccountingRouteChildren,
-)
+  AccountingRouteChildren
+);
 
 interface InventoryRouteChildren {
-  InventoryCategoriesRoute: typeof InventoryCategoriesRoute
-  InventoryLocationsRoute: typeof InventoryLocationsRoute
-  InventoryProductsRoute: typeof InventoryProductsRoute
-  InventoryPurchaseOrdersRoute: typeof InventoryPurchaseOrdersRoute
-  InventoryStockMovementsRoute: typeof InventoryStockMovementsRoute
-  InventorySuppliersRoute: typeof InventorySuppliersRoute
-  InventoryIndexRoute: typeof InventoryIndexRoute
+  InventoryCategoriesRoute: typeof InventoryCategoriesRoute;
+  InventoryLocationsRoute: typeof InventoryLocationsRoute;
+  InventoryProductsRoute: typeof InventoryProductsRoute;
+  InventoryPurchaseOrdersRoute: typeof InventoryPurchaseOrdersRoute;
+  InventorySettingsRoute: typeof InventorySettingsRoute;
+  InventoryStockMovementsRoute: typeof InventoryStockMovementsRoute;
+  InventorySuppliersRoute: typeof InventorySuppliersRoute;
+  InventoryIndexRoute: typeof InventoryIndexRoute;
 }
 
 const InventoryRouteChildren: InventoryRouteChildren = {
@@ -816,26 +836,27 @@ const InventoryRouteChildren: InventoryRouteChildren = {
   InventoryLocationsRoute: InventoryLocationsRoute,
   InventoryProductsRoute: InventoryProductsRoute,
   InventoryPurchaseOrdersRoute: InventoryPurchaseOrdersRoute,
+  InventorySettingsRoute: InventorySettingsRoute,
   InventoryStockMovementsRoute: InventoryStockMovementsRoute,
   InventorySuppliersRoute: InventorySuppliersRoute,
   InventoryIndexRoute: InventoryIndexRoute,
-}
+};
 
 const InventoryRouteWithChildren = InventoryRoute._addFileChildren(
-  InventoryRouteChildren,
-)
+  InventoryRouteChildren
+);
 
 interface InvestmentRouteChildren {
-  InvestmentCapitalCallsRoute: typeof InvestmentCapitalCallsRoute
-  InvestmentDistributionsRoute: typeof InvestmentDistributionsRoute
-  InvestmentInvestorsRoute: typeof InvestmentInvestorsRoute
-  InvestmentMilestonesRoute: typeof InvestmentMilestonesRoute
-  InvestmentPaymentsRoute: typeof InvestmentPaymentsRoute
-  InvestmentProjectsRoute: typeof InvestmentProjectsRoute
-  InvestmentReportsRoute: typeof InvestmentReportsRoute
-  InvestmentShareClassesRoute: typeof InvestmentShareClassesRoute
-  InvestmentShareholdersRoute: typeof InvestmentShareholdersRoute
-  InvestmentIndexRoute: typeof InvestmentIndexRoute
+  InvestmentCapitalCallsRoute: typeof InvestmentCapitalCallsRoute;
+  InvestmentDistributionsRoute: typeof InvestmentDistributionsRoute;
+  InvestmentInvestorsRoute: typeof InvestmentInvestorsRoute;
+  InvestmentMilestonesRoute: typeof InvestmentMilestonesRoute;
+  InvestmentPaymentsRoute: typeof InvestmentPaymentsRoute;
+  InvestmentProjectsRoute: typeof InvestmentProjectsRoute;
+  InvestmentReportsRoute: typeof InvestmentReportsRoute;
+  InvestmentShareClassesRoute: typeof InvestmentShareClassesRoute;
+  InvestmentShareholdersRoute: typeof InvestmentShareholdersRoute;
+  InvestmentIndexRoute: typeof InvestmentIndexRoute;
 }
 
 const InvestmentRouteChildren: InvestmentRouteChildren = {
@@ -849,20 +870,20 @@ const InvestmentRouteChildren: InvestmentRouteChildren = {
   InvestmentShareClassesRoute: InvestmentShareClassesRoute,
   InvestmentShareholdersRoute: InvestmentShareholdersRoute,
   InvestmentIndexRoute: InvestmentIndexRoute,
-}
+};
 
 const InvestmentRouteWithChildren = InvestmentRoute._addFileChildren(
-  InvestmentRouteChildren,
-)
+  InvestmentRouteChildren
+);
 
 interface PosRouteChildren {
-  PosCustomersRoute: typeof PosCustomersRoute
-  PosDiscountsRoute: typeof PosDiscountsRoute
-  PosGiftCardsRoute: typeof PosGiftCardsRoute
-  PosReportsRoute: typeof PosReportsRoute
-  PosReturnsRoute: typeof PosReturnsRoute
-  PosSalesRoute: typeof PosSalesRoute
-  PosIndexRoute: typeof PosIndexRoute
+  PosCustomersRoute: typeof PosCustomersRoute;
+  PosDiscountsRoute: typeof PosDiscountsRoute;
+  PosGiftCardsRoute: typeof PosGiftCardsRoute;
+  PosReportsRoute: typeof PosReportsRoute;
+  PosReturnsRoute: typeof PosReturnsRoute;
+  PosSalesRoute: typeof PosSalesRoute;
+  PosIndexRoute: typeof PosIndexRoute;
 }
 
 const PosRouteChildren: PosRouteChildren = {
@@ -873,9 +894,9 @@ const PosRouteChildren: PosRouteChildren = {
   PosReturnsRoute: PosReturnsRoute,
   PosSalesRoute: PosSalesRoute,
   PosIndexRoute: PosIndexRoute,
-}
+};
 
-const PosRouteWithChildren = PosRoute._addFileChildren(PosRouteChildren)
+const PosRouteWithChildren = PosRoute._addFileChildren(PosRouteChildren);
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -887,16 +908,17 @@ const rootRouteChildren: RootRouteChildren = {
   PosRoute: PosRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiRpcSplatRoute: ApiRpcSplatRoute,
-}
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();
 
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
+import type { createStart } from "@tanstack/react-start";
+
+import type { getRouter } from "./router.tsx";
+declare module "@tanstack/react-start" {
   interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
+    ssr: true;
+    router: Awaited<ReturnType<typeof getRouter>>;
   }
 }

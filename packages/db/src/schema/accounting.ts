@@ -42,6 +42,7 @@ export const journalSourceTypeEnum = pgEnum("journal_source_type", [
   "expense",
   "manual",
   "return",
+  "purchase_order",
 ]);
 
 export const entryLineTypeEnum = pgEnum("entry_line_type", ["debit", "credit"]);

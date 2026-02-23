@@ -349,7 +349,10 @@ function ChartOfAccountsPage() {
               <Select
                 value={form.parentId || "__none__"}
                 onValueChange={(v) =>
-                  setForm({ ...form, parentId: v === "__none__" ? "" : v })
+                  setForm({
+                    ...form,
+                    parentId: v === "__none__" ? "" : (v ?? ""),
+                  })
                 }
               >
                 <SelectTrigger id="acct-parent">

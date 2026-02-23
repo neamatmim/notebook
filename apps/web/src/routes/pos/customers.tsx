@@ -157,7 +157,7 @@ function CustomersPage() {
         };
         return (
           <span
-            className={`rounded-full px-2 py-1 text-xs font-semibold ${colors[type] ?? colors.regular}`}
+            className={`rounded-full px-2 py-1 text-xs font-semibold ${(type ? colors[type] : undefined) ?? colors.regular}`}
           >
             {type}
           </span>

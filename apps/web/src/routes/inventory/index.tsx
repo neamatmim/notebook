@@ -38,7 +38,7 @@ function InventoryOverview() {
   const totalSuppliers = suppliersQuery.data?.pagination.total ?? 0;
   const totalPurchaseOrders = purchaseOrdersQuery.data?.pagination.total ?? 0;
   const lowStockProducts = products.filter(
-    (p) => p.minStockLevel > 0 && p.reorderPoint && p.reorderPoint > 0
+    (p) => (p.minStockLevel ?? 0) > 0 && p.reorderPoint && p.reorderPoint > 0
   );
   const movements = movementsQuery.data?.items ?? [];
 

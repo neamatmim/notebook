@@ -1,11 +1,11 @@
 {
-  "$schema": "https://turbo.build/schema.json",
+  "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".output/**"],
+      "outputs": ["dist/**", ".output/**"],
       "env": [
         "DATABASE_URL",
         "BETTER_AUTH_SECRET",
@@ -14,9 +14,6 @@
         "NODE_ENV",
         "NITRO_PRESET"
       ]
-    },
-    "check-types": {
-      "dependsOn": ["^check-types"]
     },
     "dev": {
       "cache": false,

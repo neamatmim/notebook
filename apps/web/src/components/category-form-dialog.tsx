@@ -59,10 +59,16 @@ export function CategoryFormDialog({
         .queryOptions({ input: {} })
         .queryKey.slice(0, 2),
     });
+    queryClient.invalidateQueries({
+      queryKey: orpc.inventory.products.list
+        .queryOptions({ input: {} })
+        .queryKey.slice(0, 2),
+    });
   };
 
   const createMutation = useMutation(
     orpc.inventory.categories.create.mutationOptions({
+      onError: (err) => toast.error(err.message),
       onSuccess: () => {
         toast.success("Category created");
         invalidate();
@@ -73,6 +79,7 @@ export function CategoryFormDialog({
 
   const updateMutation = useMutation(
     orpc.inventory.categories.update.mutationOptions({
+      onError: (err) => toast.error(err.message),
       onSuccess: () => {
         toast.success("Category updated");
         invalidate();

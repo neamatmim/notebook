@@ -25,6 +25,7 @@ function SuppliersPage() {
     name: string;
     notes?: string;
     paymentTerms?: string;
+    paymentTermsDays?: number | null;
     phone?: string;
   } | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -95,6 +96,7 @@ function SuppliersPage() {
                 name: row.original.name,
                 notes: row.original.notes ?? undefined,
                 paymentTerms: row.original.paymentTerms ?? undefined,
+                paymentTermsDays: row.original.paymentTermsDays,
                 phone: row.original.phone ?? undefined,
               });
               setFormOpen(true);

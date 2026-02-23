@@ -3,12 +3,15 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 
 import { db } from "@notebook/db";
 import {
+  costLayers,
   customers,
+  discountUsages,
   discounts,
   dueCollections,
   employees,
   giftCardTransactions,
   giftCards,
+  inventorySettings,
   locations,
   payments,
   products,
@@ -22,12 +25,13 @@ import {
   stockMovements,
 } from "@notebook/db/schema";
 import { ORPCError } from "@orpc/server";
-import { and, desc, eq, gte, inArray, lte, sql, sum } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql, sum } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure } from "../index";
 import {
   postDueCollectionJournalEntry,
+  postReturnJournalEntry,
   postSaleJournalEntry,
 } from "./accounting";
 
@@ -159,6 +163,7 @@ const dueCollectionSchema = z.object({
 const createSaleSchema = z.object({
   customerId: z.string().uuid().optional(),
   discountAmount: z.string().default("0"),
+  discountId: z.string().uuid().optional(),
   dueCollection: dueCollectionSchema.optional(),
   items: z.array(saleItemSchema).min(1),
   locationId: z.string().uuid(),
@@ -224,6 +229,18 @@ const createReturnSchema = z.object({
     "warranty_claim",
     "other",
   ]),
+  refundMethod: z
+    .enum([
+      "cash",
+      "credit_card",
+      "debit_card",
+      "mobile_payment",
+      "check",
+      "gift_card",
+      "store_credit",
+      "on_account",
+    ])
+    .optional(),
   restockingFee: z.string().default("0"),
 });
 
@@ -730,6 +747,13 @@ export const posRouter = {
         const txResult = await db.transaction(async (tx) => {
           const employeeId = await resolveEmployeeId(tx, context.session.user);
           const receiptNumber = `REC-${Date.now()}`;
+
+          const [invSettings] = await tx
+            .select()
+            .from(inventorySettings)
+            .where(eq(inventorySettings.id, "default"))
+            .limit(1);
+          const costMethod = invSettings?.costUpdateMethod ?? "none";
           let checkoutDueCollectionId: string | null = null;
 
           let subtotal = 0;
@@ -772,6 +796,23 @@ export const posRouter = {
               totalAmount: totalAmount.toString(),
             })
             .returning();
+
+          // Track discount usage and enforce usage limits atomically
+          if (input.discountId && Number(input.discountAmount) > 0) {
+            await tx.insert(discountUsages).values({
+              customerId: input.customerId,
+              discountAmount: input.discountAmount,
+              discountId: input.discountId,
+              saleId: sale!.id,
+            });
+            await tx
+              .update(discounts)
+              .set({
+                usageCount: sql`${discounts.usageCount} + 1`,
+                updatedAt: new Date(),
+              })
+              .where(eq(discounts.id, input.discountId));
+          }
 
           for (const item of input.items) {
             const itemTotal = Number(item.unitPrice) * item.quantity;
@@ -830,6 +871,79 @@ export const posRouter = {
                 userId: context.session.user.id,
                 variantId: item.variantId,
               });
+
+              if (costMethod === "fifo") {
+                // Consume oldest cost layers first
+                let qtyToConsume = item.quantity;
+                const layers = await tx
+                  .select()
+                  .from(costLayers)
+                  .where(
+                    and(
+                      eq(costLayers.productId, item.productId),
+                      item.variantId
+                        ? eq(costLayers.variantId, item.variantId)
+                        : sql`${costLayers.variantId} IS NULL`,
+                      sql`${costLayers.remainingQuantity} > 0`
+                    )
+                  )
+                  .orderBy(asc(costLayers.receivedAt));
+
+                for (const layer of layers) {
+                  if (qtyToConsume <= 0) {
+                    break;
+                  }
+                  const consume = Math.min(
+                    qtyToConsume,
+                    layer.remainingQuantity
+                  );
+                  await tx
+                    .update(costLayers)
+                    .set({
+                      remainingQuantity: layer.remainingQuantity - consume,
+                    })
+                    .where(eq(costLayers.id, layer.id));
+                  qtyToConsume -= consume;
+                }
+
+                // Update product cost price to the new oldest remaining layer.
+                // If all layers are consumed (stock sold out) we leave the
+                // last known cost intact rather than nulling it out.
+                const [oldest] = await tx
+                  .select({ unitCost: costLayers.unitCost })
+                  .from(costLayers)
+                  .where(
+                    and(
+                      eq(costLayers.productId, item.productId),
+                      item.variantId
+                        ? eq(costLayers.variantId, item.variantId)
+                        : sql`${costLayers.variantId} IS NULL`,
+                      sql`${costLayers.remainingQuantity} > 0`
+                    )
+                  )
+                  .orderBy(asc(costLayers.receivedAt))
+                  .limit(1);
+
+                if (oldest) {
+                  if (item.variantId) {
+                    await tx
+                      .update(productVariants)
+                      .set({
+                        costPrice: oldest.unitCost,
+                        updatedAt: new Date(),
+                      })
+                      .where(eq(productVariants.id, item.variantId));
+                  } else {
+                    await tx
+                      .update(products)
+                      .set({
+                        costPrice: oldest.unitCost,
+                        updatedAt: new Date(),
+                      })
+                      .where(eq(products.id, item.productId));
+                  }
+                }
+              }
             }
           }
 
@@ -1381,9 +1495,17 @@ export const posRouter = {
 
   // Returns
   returns: {
-    create: protectedProcedure.input(createReturnSchema).handler(
-      async ({ input, context }) =>
-        await db.transaction(async (tx) => {
+    create: protectedProcedure
+      .input(createReturnSchema)
+      .handler(async ({ input, context }) => {
+        const [invSettings] = await db
+          .select({ costUpdateMethod: inventorySettings.costUpdateMethod })
+          .from(inventorySettings)
+          .where(eq(inventorySettings.id, "default"))
+          .limit(1);
+        const costMethod = invSettings?.costUpdateMethod ?? "none";
+
+        const txResult = await db.transaction(async (tx) => {
           const employeeId = await resolveEmployeeId(tx, context.session.user);
           const returnNumber = `RET-${Date.now()}`;
 
@@ -1408,9 +1530,8 @@ export const posRouter = {
               .limit(1);
 
             if (saleItem) {
-              const itemRefundAmount =
+              totalRefundAmount +=
                 Number(saleItem.unitPrice) * item.quantityReturned;
-              totalRefundAmount += itemRefundAmount;
             }
           }
 
@@ -1425,12 +1546,19 @@ export const posRouter = {
               notes: input.notes,
               originalSaleId: input.originalSaleId,
               reason: input.reason,
+              refundMethod: input.refundMethod ?? null,
               restockingFee: input.restockingFee,
               returnNumber,
               status: "approved",
               totalRefundAmount: totalRefundAmount.toString(),
             })
             .returning();
+
+          // Fetch original payments for proportional customer balance reversal
+          const originalPayments = await tx
+            .select({ amount: payments.amount, method: payments.method })
+            .from(payments)
+            .where(eq(payments.saleId, input.originalSaleId));
 
           for (const item of input.items) {
             const [saleItem] = await tx
@@ -1442,6 +1570,21 @@ export const posRouter = {
             if (!saleItem) {
               throw new ORPCError("NOT_FOUND", {
                 message: `Sale item ${item.saleItemId} not found`,
+              });
+            }
+
+            // Duplicate-return guard: sum already-returned qty for this saleItem
+            const [alreadyReturned] = await tx
+              .select({
+                total: sql<number>`coalesce(sum(${returnItems.quantityReturned}), 0)`,
+              })
+              .from(returnItems)
+              .where(eq(returnItems.saleItemId, item.saleItemId));
+
+            const alreadyQty = Number(alreadyReturned?.total ?? 0);
+            if (alreadyQty + item.quantityReturned > saleItem.quantity) {
+              throw new ORPCError("BAD_REQUEST", {
+                message: `Cannot return ${item.quantityReturned} unit(s) — only ${saleItem.quantity - alreadyQty} returnable for this sale item`,
               });
             }
 
@@ -1512,12 +1655,213 @@ export const posRouter = {
                 userId: context.session.user.id,
                 variantId: saleItem.variantId,
               });
+
+              // Reverse FIFO cost layers for restocked items
+              if (costMethod === "fifo") {
+                let qtyToRestore = item.quantityReturned;
+                // Restore to newest consumed layers first (reverse-FIFO)
+                const layers = await tx
+                  .select()
+                  .from(costLayers)
+                  .where(
+                    and(
+                      eq(costLayers.productId, saleItem.productId),
+                      saleItem.variantId
+                        ? eq(costLayers.variantId, saleItem.variantId)
+                        : sql`${costLayers.variantId} IS NULL`,
+                      sql`${costLayers.remainingQuantity} < ${costLayers.originalQuantity}`
+                    )
+                  )
+                  .orderBy(desc(costLayers.receivedAt));
+
+                for (const layer of layers) {
+                  if (qtyToRestore <= 0) {
+                    break;
+                  }
+                  const canRestore =
+                    layer.originalQuantity - layer.remainingQuantity;
+                  const restore = Math.min(qtyToRestore, canRestore);
+                  await tx
+                    .update(costLayers)
+                    .set({
+                      remainingQuantity: layer.remainingQuantity + restore,
+                    })
+                    .where(eq(costLayers.id, layer.id));
+                  qtyToRestore -= restore;
+                }
+
+                // Update costPrice to the new oldest remaining layer
+                const [oldest] = await tx
+                  .select({ unitCost: costLayers.unitCost })
+                  .from(costLayers)
+                  .where(
+                    and(
+                      eq(costLayers.productId, saleItem.productId),
+                      saleItem.variantId
+                        ? eq(costLayers.variantId, saleItem.variantId)
+                        : sql`${costLayers.variantId} IS NULL`,
+                      sql`${costLayers.remainingQuantity} > 0`
+                    )
+                  )
+                  .orderBy(asc(costLayers.receivedAt))
+                  .limit(1);
+
+                if (oldest) {
+                  if (saleItem.variantId) {
+                    await tx
+                      .update(productVariants)
+                      .set({
+                        costPrice: oldest.unitCost,
+                        updatedAt: new Date(),
+                      })
+                      .where(eq(productVariants.id, saleItem.variantId));
+                  } else {
+                    await tx
+                      .update(products)
+                      .set({
+                        costPrice: oldest.unitCost,
+                        updatedAt: new Date(),
+                      })
+                      .where(eq(products.id, saleItem.productId));
+                  }
+                }
+              }
             }
           }
 
-          return returnRecord;
-        })
-    ),
+          // Restore customer balances proportional to the refund amount
+          if (input.customerId) {
+            const saleTotal = Number(originalSale.totalAmount);
+            const proportion =
+              saleTotal > 0 ? totalRefundAmount / saleTotal : 0;
+
+            const storeCreditTotal = originalPayments
+              .filter((p) => p.method === "store_credit")
+              .reduce((s, p) => s + Number(p.amount), 0);
+            const onAccountTotal = originalPayments
+              .filter((p) => p.method === "on_account")
+              .reduce((s, p) => s + Number(p.amount), 0);
+
+            const storeCreditRestore = +(storeCreditTotal * proportion).toFixed(
+              2
+            );
+            const onAccountRestore = +(onAccountTotal * proportion).toFixed(2);
+            const loyaltyPointsToDeduct = Math.floor(totalRefundAmount);
+
+            await tx
+              .update(customers)
+              .set({
+                creditBalance: sql`${customers.creditBalance} + ${storeCreditRestore}`,
+                dueBalance: sql`GREATEST(0, ${customers.dueBalance} - ${onAccountRestore})`,
+                loyaltyPoints: sql`GREATEST(0, ${customers.loyaltyPoints} - ${loyaltyPointsToDeduct})`,
+                totalSpent: sql`GREATEST(0, ${customers.totalSpent} - ${totalRefundAmount})`,
+                updatedAt: new Date(),
+              })
+              .where(eq(customers.id, input.customerId));
+          }
+
+          // Restore gift card balances proportionally
+          const gcTransactions = await tx
+            .select({
+              amount: giftCardTransactions.amount,
+              balanceBefore: giftCardTransactions.balanceBefore,
+              giftCardId: giftCardTransactions.giftCardId,
+            })
+            .from(giftCardTransactions)
+            .where(
+              and(
+                eq(giftCardTransactions.saleId, input.originalSaleId),
+                eq(giftCardTransactions.type, "redemption")
+              )
+            );
+
+          if (gcTransactions.length > 0) {
+            const saleTotal = Number(originalSale.totalAmount);
+            const proportion =
+              saleTotal > 0 ? totalRefundAmount / saleTotal : 0;
+
+            for (const gct of gcTransactions) {
+              const restoreAmt = +(Number(gct.amount) * proportion).toFixed(2);
+              if (restoreAmt <= 0) {
+                continue;
+              }
+
+              const [gc] = await tx
+                .select({ currentBalance: giftCards.currentBalance })
+                .from(giftCards)
+                .where(eq(giftCards.id, gct.giftCardId))
+                .limit(1);
+
+              if (!gc) {
+                continue;
+              }
+
+              const newBalance = (
+                Number(gc.currentBalance) + restoreAmt
+              ).toFixed(2);
+
+              await tx
+                .update(giftCards)
+                .set({ currentBalance: newBalance, updatedAt: new Date() })
+                .where(eq(giftCards.id, gct.giftCardId));
+
+              await tx.insert(giftCardTransactions).values({
+                amount: restoreAmt.toString(),
+                balanceAfter: newBalance,
+                balanceBefore: gc.currentBalance,
+                giftCardId: gct.giftCardId,
+                returnId: returnRecord!.id,
+                type: "refund",
+              });
+            }
+          }
+
+          // Create a payment record for the refund
+          if (input.refundMethod) {
+            await tx.insert(payments).values({
+              amount: totalRefundAmount.toString(),
+              method: input.refundMethod,
+              processedAt: new Date(),
+              returnId: returnRecord!.id,
+              status: "completed",
+            });
+          }
+
+          // Decrement shift totals for the original sale's shift
+          if (originalSale.shiftId) {
+            await tx
+              .update(shifts)
+              .set({
+                totalSales: sql`GREATEST(0, ${shifts.totalSales} - ${totalRefundAmount})`,
+                transactionCount: sql`GREATEST(0, ${shifts.transactionCount} - 1)`,
+                updatedAt: new Date(),
+              })
+              .where(eq(shifts.id, originalSale.shiftId));
+          }
+
+          return { originalSale, returnRecord };
+        });
+
+        // Post reversal journal entry outside the transaction so accounting
+        // failures never roll back the return.
+        try {
+          await postReturnJournalEntry(
+            db,
+            {
+              date: new Date(),
+              id: txResult.returnRecord!.id,
+              originalSaleTax: txResult.originalSale.taxAmount,
+              originalSaleTotal: txResult.originalSale.totalAmount,
+              totalRefundAmount: txResult.returnRecord!.totalRefundAmount,
+            },
+            context.session.user.id
+          );
+        } catch {
+          // Accounting not configured — return still succeeded
+        }
+
+        return txResult.returnRecord;
+      }),
 
     list: protectedProcedure
       .input(paginationSchema)

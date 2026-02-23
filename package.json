@@ -26,8 +26,6 @@
     "clean:workspaces": "turbo run clean",
     "dev": "turbo dev",
     "build": "turbo build",
-    "check-types": "turbo check-types",
-    "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev",
     "build:web": "turbo -F web build",
     "start:web": "turbo -F web start",

@@ -27,6 +27,7 @@ interface SupplierFormData {
   name: string;
   notes: string;
   paymentTerms: string;
+  paymentTermsDays: string;
   phone: string;
 }
 
@@ -38,11 +39,17 @@ const emptyForm: SupplierFormData = {
   name: "",
   notes: "",
   paymentTerms: "",
+  paymentTermsDays: "",
   phone: "",
 };
 
 interface SupplierFormDialogProps {
-  editData?: (Partial<SupplierFormData> & { name: string }) | null;
+  editData?:
+    | (Omit<Partial<SupplierFormData>, "paymentTermsDays"> & {
+        name: string;
+        paymentTermsDays?: number | null;
+      })
+    | null;
   editId?: string | null;
   onClose: () => void;
   open: boolean;
@@ -67,6 +74,11 @@ export function SupplierFormDialog({
         name: editData.name,
         notes: editData.notes ?? "",
         paymentTerms: editData.paymentTerms ?? "",
+        paymentTermsDays:
+          editData.paymentTermsDays !== null &&
+          editData.paymentTermsDays !== undefined
+            ? String(editData.paymentTermsDays)
+            : "",
         phone: editData.phone ?? "",
       });
     } else if (!editId) {
@@ -80,10 +92,16 @@ export function SupplierFormDialog({
         .queryOptions({ input: {} })
         .queryKey.slice(0, 2),
     });
+    queryClient.invalidateQueries({
+      queryKey: orpc.inventory.products.list
+        .queryOptions({ input: {} })
+        .queryKey.slice(0, 2),
+    });
   };
 
   const createMutation = useMutation(
     orpc.inventory.suppliers.create.mutationOptions({
+      onError: (err) => toast.error(err.message),
       onSuccess: () => {
         toast.success("Supplier created");
         invalidate();
@@ -94,6 +112,7 @@ export function SupplierFormDialog({
 
   const updateMutation = useMutation(
     orpc.inventory.suppliers.update.mutationOptions({
+      onError: (err) => toast.error(err.message),
       onSuccess: () => {
         toast.success("Supplier updated");
         invalidate();
@@ -114,6 +133,9 @@ export function SupplierFormDialog({
       name: form.name,
       notes: form.notes || undefined,
       paymentTerms: form.paymentTerms || undefined,
+      paymentTermsDays: form.paymentTermsDays
+        ? Number(form.paymentTermsDays)
+        : undefined,
       phone: form.phone || undefined,
     };
     if (isEdit && editId) {
@@ -206,13 +228,26 @@ export function SupplierFormDialog({
                 onChange={(e) => updateField("country", e.target.value)}
               />
             </div>
-            <div className="col-span-2 space-y-2">
+            <div className="space-y-2">
               <Label htmlFor="sup-terms">Payment Terms</Label>
               <Input
                 id="sup-terms"
                 value={form.paymentTerms}
                 onChange={(e) => updateField("paymentTerms", e.target.value)}
                 placeholder="e.g., Net 30"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sup-terms-days">Payment Terms (days)</Label>
+              <Input
+                id="sup-terms-days"
+                type="number"
+                min="0"
+                value={form.paymentTermsDays}
+                onChange={(e) =>
+                  updateField("paymentTermsDays", e.target.value)
+                }
+                placeholder="e.g. 30"
               />
             </div>
           </div>

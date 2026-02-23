@@ -69,3 +69,9 @@ notebook/
 - `bun run db:generate`: Generate database client/types
 - `bun run db:migrate`: Run database migrations
 - `bun run db:studio`: Open database studio UI
+
+<!-- "env": ["SERVER_*", "VITE_*"] -->
+ <!-- "//#check": {},
+    "//#fix": {
+      "cache": false
+    }, -->

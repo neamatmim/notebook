@@ -121,6 +121,7 @@ export function ProductFormDialog({
 
   const createMutation = useMutation(
     orpc.inventory.products.create.mutationOptions({
+      onError: (err) => toast.error(err.message),
       onSuccess: () => {
         toast.success("Product created");
         invalidateProducts();
@@ -131,6 +132,7 @@ export function ProductFormDialog({
 
   const updateMutation = useMutation(
     orpc.inventory.products.update.mutationOptions({
+      onError: (err) => toast.error(err.message),
       onSuccess: () => {
         toast.success("Product updated");
         invalidateProducts();

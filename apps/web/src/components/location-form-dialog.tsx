@@ -84,6 +84,7 @@ export function LocationFormDialog({
 
   const createMutation = useMutation(
     orpc.inventory.locations.create.mutationOptions({
+      onError: (err) => toast.error(err.message),
       onSuccess: () => {
         toast.success("Location created");
         invalidate();
@@ -94,6 +95,7 @@ export function LocationFormDialog({
 
   const updateMutation = useMutation(
     orpc.inventory.locations.update.mutationOptions({
+      onError: (err) => toast.error(err.message),
       onSuccess: () => {
         toast.success("Location updated");
         invalidate();

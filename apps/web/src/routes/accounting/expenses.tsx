@@ -315,7 +315,7 @@ function ExpensesPage() {
                 onValueChange={(v) =>
                   setForm({
                     ...form,
-                    categoryAccountId: v === "__none__" ? "" : v,
+                    categoryAccountId: v === "__none__" ? "" : (v ?? ""),
                   })
                 }
               >
@@ -339,7 +339,7 @@ function ExpensesPage() {
                 onValueChange={(v) =>
                   setForm({
                     ...form,
-                    paymentAccountId: v === "__none__" ? "" : v,
+                    paymentAccountId: v === "__none__" ? "" : (v ?? ""),
                   })
                 }
               >

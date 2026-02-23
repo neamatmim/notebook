@@ -45,18 +45,24 @@ function PurchaseOrdersPage() {
       cell: ({ row }) => {
         const { status } = row.original;
         const colors: Record<string, string> = {
+          approved:
+            "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-300",
           cancelled:
             "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
           draft:
             "bg-gray-100 text-gray-800 dark:bg-gray-900/50 dark:text-gray-300",
           ordered:
             "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
+          partial:
+            "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300",
+          pending:
+            "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
           received:
             "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
         };
         return (
           <span
-            className={`rounded-full px-2 py-1 text-xs font-semibold ${colors[status] ?? colors.draft}`}
+            className={`rounded-full px-2 py-1 text-xs font-semibold ${(status ? colors[status] : undefined) ?? colors.draft}`}
           >
             {status}
           </span>
@@ -84,6 +90,51 @@ function PurchaseOrdersPage() {
           ? new Date(row.original.expectedDate).toLocaleDateString()
           : "—",
       header: "Expected Date",
+    },
+    {
+      accessorKey: "paymentDueDate",
+      cell: ({ row }) => {
+        const { paymentDueDate, paymentStatus } = row.original;
+        if (!paymentDueDate) {
+          return "—";
+        }
+        const isOverdue =
+          new Date(paymentDueDate) < new Date() && paymentStatus !== "paid";
+        return (
+          <div className="flex items-center gap-1">
+            <span>{new Date(paymentDueDate).toLocaleDateString()}</span>
+            {isOverdue && (
+              <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-800 dark:bg-red-900/50 dark:text-red-300">
+                overdue
+              </span>
+            )}
+          </div>
+        );
+      },
+      header: "Due Date",
+    },
+    {
+      accessorKey: "paymentStatus",
+      cell: ({ row }) => {
+        const status = row.original.paymentStatus ?? "unpaid";
+        const colors: Record<string, string> = {
+          overdue:
+            "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+          paid: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
+          partially_paid:
+            "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300",
+          unpaid:
+            "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
+        };
+        return (
+          <span
+            className={`rounded-full px-2 py-1 text-xs font-semibold ${colors[status] ?? colors.unpaid}`}
+          >
+            {status}
+          </span>
+        );
+      },
+      header: "Payment",
     },
     {
       cell: ({ row }) => (

@@ -21,3 +21,10 @@ services:
 
 volumes:
   notebook_postgres_data:
+
+#  environment:
+#       - POSTGRES_DB=${DB_NAME:-proapay_dev}
+#       - POSTGRES_USER=${DB_USER:-postgres}
+#       - POSTGRES_PASSWORD=${DB_PASSWORD:-password}
+#     ports:
+#       - ${DB_PORT:-54322}:5432

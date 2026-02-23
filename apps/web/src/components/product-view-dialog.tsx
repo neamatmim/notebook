@@ -147,7 +147,7 @@ export function ProductViewDialog({
                           <span className="text-muted-foreground text-xs ml-1">
                             qty
                           </span>
-                          {stock.reservedQuantity > 0 && (
+                          {(stock.reservedQuantity ?? 0) > 0 && (
                             <span className="text-muted-foreground ml-2 text-xs">
                               ({stock.reservedQuantity} reserved)
                             </span>

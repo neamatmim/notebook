@@ -1,14 +1,15 @@
 import type { ColumnDef } from "@tanstack/react-table";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { MapPin, Pencil, Plus } from "lucide-react";
+import { MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { LocationFormDialog } from "@/components/location-form-dialog";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
-import { orpc } from "@/utils/orpc";
+import { queryClient, orpc } from "@/utils/orpc";
 
 function LocationsPage() {
   const [formOpen, setFormOpen] = useState(false);
@@ -26,6 +27,18 @@ function LocationsPage() {
 
   const locationsQuery = useQuery(
     orpc.inventory.locations.list.queryOptions({})
+  );
+
+  const deleteMutation = useMutation(
+    orpc.inventory.locations.delete.mutationOptions({
+      onError: (err) => toast.error(err.message),
+      onSuccess: () => {
+        toast.success("Location deleted");
+        queryClient.invalidateQueries({
+          queryKey: orpc.inventory.locations.list.queryOptions({}).queryKey,
+        });
+      },
+    })
   );
 
   const items = locationsQuery.data ?? [];
@@ -72,26 +85,39 @@ function LocationsPage() {
     },
     {
       cell: ({ row }) => (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            setEditId(row.original.id);
-            setEditData({
-              address: row.original.address ?? undefined,
-              city: row.original.city ?? undefined,
-              country: row.original.country ?? undefined,
-              isPrimary: row.original.isPrimary ?? false,
-              name: row.original.name,
-              state: row.original.state ?? undefined,
-              type: row.original.type,
-              zipCode: row.original.zipCode ?? undefined,
-            });
-            setFormOpen(true);
-          }}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setEditId(row.original.id);
+              setEditData({
+                address: row.original.address ?? undefined,
+                city: row.original.city ?? undefined,
+                country: row.original.country ?? undefined,
+                isPrimary: row.original.isPrimary ?? false,
+                name: row.original.name,
+                state: row.original.state ?? undefined,
+                type: row.original.type,
+                zipCode: row.original.zipCode ?? undefined,
+              });
+              setFormOpen(true);
+            }}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-red-600 hover:text-red-700"
+            disabled={deleteMutation.isPending}
+            onClick={() => {
+              deleteMutation.mutate({ id: row.original.id });
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       ),
       header: "Actions",
       id: "actions",

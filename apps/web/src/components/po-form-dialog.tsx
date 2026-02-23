@@ -45,6 +45,10 @@ export function POFormDialog({ open, onClose }: POFormDialogProps) {
     })
   );
 
+  const selectedSupplier = suppliersQuery.data?.items.find(
+    (s) => s.id === supplierId
+  );
+
   const productsQuery = useQuery(
     orpc.inventory.products.list.queryOptions({
       enabled: open,
@@ -54,6 +58,7 @@ export function POFormDialog({ open, onClose }: POFormDialogProps) {
 
   const createMutation = useMutation(
     orpc.inventory.purchaseOrders.create.mutationOptions({
+      onError: (err) => toast.error(err.message),
       onSuccess: (data) => {
         toast.success(`Purchase order ${data.poNumber} created`);
         queryClient.invalidateQueries({
@@ -155,6 +160,27 @@ export function POFormDialog({ open, onClose }: POFormDialogProps) {
                   </option>
                 ))}
               </select>
+              {selectedSupplier?.paymentTermsDays !== null &&
+                selectedSupplier?.paymentTermsDays !== undefined && (
+                  <p className="text-muted-foreground text-xs">
+                    Payment due:{" "}
+                    {(() => {
+                      const due = new Date();
+                      due.setDate(
+                        due.getDate() + selectedSupplier.paymentTermsDays!
+                      );
+                      return due.toLocaleDateString("en-US", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      });
+                    })()}{" "}
+                    (
+                    {selectedSupplier.paymentTerms ||
+                      `${selectedSupplier.paymentTermsDays}d`}
+                    )
+                  </p>
+                )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="po-expected">Expected Date</Label>

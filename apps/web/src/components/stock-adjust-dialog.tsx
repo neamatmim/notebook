@@ -43,10 +43,16 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
 
   const adjustMutation = useMutation(
     orpc.inventory.stock.adjust.mutationOptions({
+      onError: (err) => toast.error(err.message),
       onSuccess: (data) => {
         toast.success(`Stock adjusted. New quantity: ${data.newQuantity}`);
         queryClient.invalidateQueries({
           queryKey: orpc.inventory.stock.movements
+            .queryOptions({ input: {} })
+            .queryKey.slice(0, 2),
+        });
+        queryClient.invalidateQueries({
+          queryKey: orpc.inventory.products.list
             .queryOptions({ input: {} })
             .queryKey.slice(0, 2),
         });
