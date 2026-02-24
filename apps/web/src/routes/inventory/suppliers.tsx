@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { SupplierFormDialog } from "@/components/supplier-form-dialog";
@@ -11,10 +12,21 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { queryClient, orpc } from "@/utils/orpc";
 
+type SupplierStatus = "active" | "inactive" | "suspended";
+const STATUS_TABS: { label: string; value: SupplierStatus | "all" }[] = [
+  { label: "Active & Suspended", value: "all" },
+  { label: "Active", value: "active" },
+  { label: "Suspended", value: "suspended" },
+  { label: "Inactive", value: "inactive" },
+];
+
 const PAGE_SIZE = 20;
 
 function SuppliersPage() {
   const [page, setPage] = useState(0);
+  const [statusFilter, setStatusFilter] = useState<SupplierStatus | "all">(
+    "all"
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editData, setEditData] = useState<{
@@ -27,18 +39,25 @@ function SuppliersPage() {
     paymentTerms?: string;
     paymentTermsDays?: number | null;
     phone?: string;
+    status?: "active" | "inactive" | "suspended";
   } | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const suppliersQuery = useQuery(
     orpc.inventory.suppliers.list.queryOptions({
-      input: { limit: PAGE_SIZE, offset: page * PAGE_SIZE },
+      input: {
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+        status: statusFilter === "all" ? undefined : statusFilter,
+      },
     })
   );
 
   const deleteMutation = useMutation(
     orpc.inventory.suppliers.delete.mutationOptions({
+      onError: (err) => toast.error(err.message),
       onSuccess: () => {
+        toast.success("Supplier deleted");
         queryClient.invalidateQueries({
           queryKey: orpc.inventory.suppliers.list
             .queryOptions({ input: {} })
@@ -81,6 +100,28 @@ function SuppliersPage() {
       header: "Location",
     },
     {
+      accessorKey: "status",
+      cell: ({ row }) => {
+        const s = (row.original.status ?? "active") as SupplierStatus;
+        const colors: Record<SupplierStatus, string> = {
+          active:
+            "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
+          inactive:
+            "bg-gray-100 text-gray-800 dark:bg-gray-900/50 dark:text-gray-300",
+          suspended:
+            "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300",
+        };
+        return (
+          <span
+            className={`rounded-full px-2 py-1 text-xs font-semibold ${colors[s]}`}
+          >
+            {s}
+          </span>
+        );
+      },
+      header: "Status",
+    },
+    {
       cell: ({ row }) => (
         <div className="flex gap-1">
           <Button
@@ -98,6 +139,7 @@ function SuppliersPage() {
                 paymentTerms: row.original.paymentTerms ?? undefined,
                 paymentTermsDays: row.original.paymentTermsDays,
                 phone: row.original.phone ?? undefined,
+                status: row.original.status ?? "active",
               });
               setFormOpen(true);
             }}
@@ -139,6 +181,26 @@ function SuppliersPage() {
           <Plus className="mr-2 h-4 w-4" />
           Add Supplier
         </Button>
+      </div>
+
+      <div className="mb-4 flex gap-1 border-b">
+        {STATUS_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => {
+              setStatusFilter(tab.value);
+              setPage(0);
+            }}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              statusFilter === tab.value
+                ? "border-b-2 border-blue-600 text-blue-600"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       <DataTable

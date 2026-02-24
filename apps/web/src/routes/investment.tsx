@@ -18,6 +18,7 @@ import {
   TrendingUp,
   UserCheck,
   Users,
+  Wallet,
 } from "lucide-react";
 
 import { getUser } from "@/functions/get-user";
@@ -35,7 +36,9 @@ const navigation = [
   { href: "/investment/reports", icon: BarChart3, name: "Reports" },
   { href: "/investment/share-classes", icon: Layers, name: "Share Classes" },
   { href: "/investment/shareholders", icon: UserCheck, name: "Shareholders" },
+  { href: "/investment/cash-flows", icon: TrendingUp, name: "Cash Flows" },
   { href: "/investment/capital-calls", icon: PhoneCall, name: "Capital Calls" },
+  { href: "/investment/investments", icon: Wallet, name: "Investments" },
   { href: "/investment/payments", icon: CreditCard, name: "Payments" },
   { href: "/investment/fee-schedules", icon: Receipt, name: "Fee Schedules" },
   { href: "/investment/fee-invoices", icon: FileText, name: "Fee Invoices" },

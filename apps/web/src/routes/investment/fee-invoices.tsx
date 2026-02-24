@@ -126,6 +126,12 @@ function FeeInvoicesPage() {
     })
   );
 
+  const delinquencyQuery = useQuery(
+    orpc.investment.membershipFees.report.delinquency.queryOptions({
+      input: {},
+    })
+  );
+
   const invoices = invoicesQuery.data?.items ?? [];
   const schedules = schedulesQuery.data?.items ?? [];
 
@@ -435,6 +441,70 @@ function FeeInvoicesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delinquency Report */}
+      <div className="border-t pt-6">
+        <h2 className="mb-4 text-xl font-semibold">Delinquency Report</h2>
+        <Card>
+          <CardHeader />
+          <CardContent>
+            {delinquencyQuery.isPending ? (
+              <p className="text-muted-foreground text-sm">Loading…</p>
+            ) : (delinquencyQuery.data?.length ?? 0) === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                No delinquent invoices.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="pb-2 font-medium">Invoice #</th>
+                      <th className="pb-2 font-medium">Member</th>
+                      <th className="pb-2 font-medium">Schedule</th>
+                      <th className="pb-2 font-medium text-right">Amount</th>
+                      <th className="pb-2 font-medium">Due Date</th>
+                      <th className="pb-2 font-medium text-right">
+                        Days Overdue
+                      </th>
+                      <th className="pb-2 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {delinquencyQuery.data?.map((row) => (
+                      <tr key={row.id} className="border-b last:border-0">
+                        <td className="py-2 font-mono text-xs">
+                          {row.invoiceNumber}
+                        </td>
+                        <td className="py-2">{row.investorName}</td>
+                        <td className="text-muted-foreground py-2">
+                          {row.scheduleName}
+                        </td>
+                        <td className="py-2 text-right font-mono">
+                          ${Number(row.amount).toFixed(2)}
+                        </td>
+                        <td className="text-muted-foreground py-2">
+                          {new Date(row.dueDate).toLocaleDateString()}
+                        </td>
+                        <td className="py-2 text-right font-semibold text-red-600">
+                          {row.daysOverdue}d
+                        </td>
+                        <td className="py-2">
+                          <span
+                            className={`rounded px-2 py-0.5 text-xs ${STATUS_COLORS[row.status as InvoiceStatus] ?? ""}`}
+                          >
+                            {row.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

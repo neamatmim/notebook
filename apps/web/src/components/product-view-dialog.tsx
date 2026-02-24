@@ -1,6 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import type { FormEvent } from "react";
 
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -9,17 +14,43 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { orpc } from "@/utils/orpc";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { queryClient, orpc } from "@/utils/orpc";
 
 interface ProductViewDialogProps {
   onClose: () => void;
   productId: string | null;
 }
 
+interface VariantFormState {
+  attributeType: string;
+  attributeValue: string;
+  barcode: string;
+  costPrice: string;
+  editId: string | null;
+  name: string;
+  sellingPrice: string;
+  sku: string;
+}
+
+const emptyVariantForm: VariantFormState = {
+  attributeType: "",
+  attributeValue: "",
+  barcode: "",
+  costPrice: "",
+  editId: null,
+  name: "",
+  sellingPrice: "",
+  sku: "",
+};
+
 export function ProductViewDialog({
   productId,
   onClose,
 }: ProductViewDialogProps) {
+  const [variantForm, setVariantForm] = useState<VariantFormState | null>(null);
+
   const productQuery = useQuery(
     orpc.inventory.products.get.queryOptions({
       enabled: Boolean(productId),
@@ -34,8 +65,77 @@ export function ProductViewDialog({
     })
   );
 
+  const variantsQuery = useQuery(
+    orpc.inventory.products.variants.list.queryOptions({
+      enabled: Boolean(productId),
+      input: { productId: productId! },
+    })
+  );
+
+  const invalidateVariants = () => {
+    queryClient.invalidateQueries({
+      queryKey: orpc.inventory.products.variants.list
+        .queryOptions({ input: { productId: productId! } })
+        .queryKey.slice(0, 2),
+    });
+  };
+
+  const createVariantMutation = useMutation(
+    orpc.inventory.products.variants.create.mutationOptions({
+      onError: (err) => toast.error(err.message),
+      onSuccess: () => {
+        toast.success("Variant created");
+        invalidateVariants();
+        setVariantForm(null);
+      },
+    })
+  );
+
+  const updateVariantMutation = useMutation(
+    orpc.inventory.products.variants.update.mutationOptions({
+      onError: (err) => toast.error(err.message),
+      onSuccess: () => {
+        toast.success("Variant updated");
+        invalidateVariants();
+        setVariantForm(null);
+      },
+    })
+  );
+
+  const deleteVariantMutation = useMutation(
+    orpc.inventory.products.variants.delete.mutationOptions({
+      onError: (err) => toast.error(err.message),
+      onSuccess: () => {
+        toast.success("Variant deleted");
+        invalidateVariants();
+      },
+    })
+  );
+
+  const handleVariantSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!variantForm || !productId) {
+      return;
+    }
+    const payload = {
+      attributeType: variantForm.attributeType || undefined,
+      attributeValue: variantForm.attributeValue || undefined,
+      barcode: variantForm.barcode || undefined,
+      costPrice: variantForm.costPrice || undefined,
+      name: variantForm.name,
+      sellingPrice: variantForm.sellingPrice || undefined,
+      sku: variantForm.sku,
+    };
+    if (variantForm.editId) {
+      updateVariantMutation.mutate({ ...payload, id: variantForm.editId });
+    } else {
+      createVariantMutation.mutate({ ...payload, productId });
+    }
+  };
+
   const p = productQuery.data;
   const stockData = stockQuery.data ?? [];
+  const variants = variantsQuery.data ?? [];
   const { isLoading } = productQuery;
 
   return (
@@ -152,6 +252,231 @@ export function ProductViewDialog({
                               ({stock.reservedQuantity} reserved)
                             </span>
                           )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">Variants</CardTitle>
+                  {!variantForm && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setVariantForm({ ...emptyVariantForm, editId: null })
+                      }
+                    >
+                      <Plus className="mr-1 h-3 w-3" />
+                      Add Variant
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {variantForm && (
+                  <form
+                    onSubmit={handleVariantSubmit}
+                    className="bg-muted/50 space-y-3 rounded-md border p-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        {variantForm.editId ? "Edit Variant" : "New Variant"}
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setVariantForm(null)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">
+                          Name <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          required
+                          value={variantForm.name}
+                          onChange={(e) =>
+                            setVariantForm((f) =>
+                              f ? { ...f, name: e.target.value } : f
+                            )
+                          }
+                          placeholder="e.g., Red / Large"
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">
+                          SKU <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          required
+                          value={variantForm.sku}
+                          onChange={(e) =>
+                            setVariantForm((f) =>
+                              f ? { ...f, sku: e.target.value } : f
+                            )
+                          }
+                          placeholder="e.g., PROD-001-RED"
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Attribute Type</Label>
+                        <Input
+                          value={variantForm.attributeType}
+                          onChange={(e) =>
+                            setVariantForm((f) =>
+                              f ? { ...f, attributeType: e.target.value } : f
+                            )
+                          }
+                          placeholder="e.g., Color"
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Attribute Value</Label>
+                        <Input
+                          value={variantForm.attributeValue}
+                          onChange={(e) =>
+                            setVariantForm((f) =>
+                              f ? { ...f, attributeValue: e.target.value } : f
+                            )
+                          }
+                          placeholder="e.g., Red"
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Cost Price</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={variantForm.costPrice}
+                          onChange={(e) =>
+                            setVariantForm((f) =>
+                              f ? { ...f, costPrice: e.target.value } : f
+                            )
+                          }
+                          placeholder="0.00"
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Selling Price</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={variantForm.sellingPrice}
+                          onChange={(e) =>
+                            setVariantForm((f) =>
+                              f ? { ...f, sellingPrice: e.target.value } : f
+                            )
+                          }
+                          placeholder="0.00"
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setVariantForm(null)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700"
+                        disabled={
+                          createVariantMutation.isPending ||
+                          updateVariantMutation.isPending
+                        }
+                      >
+                        {(createVariantMutation.isPending ||
+                          updateVariantMutation.isPending) && (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        )}
+                        {variantForm.editId ? "Save" : "Add"}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+
+                {variantsQuery.isLoading ? (
+                  <p className="text-muted-foreground text-xs">Loading…</p>
+                ) : variants.length === 0 && !variantForm ? (
+                  <p className="text-muted-foreground text-xs">
+                    No variants defined
+                  </p>
+                ) : (
+                  <div className="space-y-1">
+                    {variants.map((v) => (
+                      <div
+                        key={v.id}
+                        className="bg-muted flex items-center justify-between rounded p-2 text-sm"
+                      >
+                        <div>
+                          <span className="font-medium">{v.name}</span>
+                          <span className="text-muted-foreground ml-2 font-mono text-xs">
+                            {v.sku}
+                          </span>
+                          {v.attributeType && v.attributeValue && (
+                            <span className="text-muted-foreground ml-2 text-xs">
+                              {v.attributeType}: {v.attributeValue}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {v.sellingPrice && (
+                            <span className="text-muted-foreground text-xs">
+                              ${Number(v.sellingPrice).toFixed(2)}
+                            </span>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0"
+                            onClick={() =>
+                              setVariantForm({
+                                attributeType: v.attributeType ?? "",
+                                attributeValue: v.attributeValue ?? "",
+                                barcode: v.barcode ?? "",
+                                costPrice: v.costPrice ?? "",
+                                editId: v.id,
+                                name: v.name,
+                                sellingPrice: v.sellingPrice ?? "",
+                                sku: v.sku,
+                              })
+                            }
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0 text-red-500 hover:text-red-600"
+                            disabled={deleteVariantMutation.isPending}
+                            onClick={() =>
+                              deleteVariantMutation.mutate({ id: v.id })
+                            }
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
                       </div>
                     ))}

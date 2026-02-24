@@ -6,6 +6,7 @@ import { MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { LocationFormDialog } from "@/components/location-form-dialog";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -14,6 +15,7 @@ import { queryClient, orpc } from "@/utils/orpc";
 function LocationsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editData, setEditData] = useState<{
     address?: string;
     city?: string;
@@ -110,10 +112,7 @@ function LocationsPage() {
             size="sm"
             variant="outline"
             className="text-red-600 hover:text-red-700"
-            disabled={deleteMutation.isPending}
-            onClick={() => {
-              deleteMutation.mutate({ id: row.original.id });
-            }}
+            onClick={() => setDeleteId(row.original.id)}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -161,6 +160,22 @@ function LocationsPage() {
         }}
         editId={editId}
         editData={editData}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteId)}
+        onClose={() => setDeleteId(null)}
+        onConfirm={() => {
+          if (deleteId) {
+            deleteMutation.mutate({ id: deleteId });
+            setDeleteId(null);
+          }
+        }}
+        title="Delete Location"
+        description="Are you sure you want to delete this location? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleteMutation.isPending}
       />
     </div>
   );

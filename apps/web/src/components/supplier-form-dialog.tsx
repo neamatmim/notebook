@@ -29,6 +29,7 @@ interface SupplierFormData {
   paymentTerms: string;
   paymentTermsDays: string;
   phone: string;
+  status: "active" | "inactive" | "suspended";
 }
 
 const emptyForm: SupplierFormData = {
@@ -41,6 +42,7 @@ const emptyForm: SupplierFormData = {
   paymentTerms: "",
   paymentTermsDays: "",
   phone: "",
+  status: "active",
 };
 
 interface SupplierFormDialogProps {
@@ -48,6 +50,7 @@ interface SupplierFormDialogProps {
     | (Omit<Partial<SupplierFormData>, "paymentTermsDays"> & {
         name: string;
         paymentTermsDays?: number | null;
+        status?: "active" | "inactive" | "suspended";
       })
     | null;
   editId?: string | null;
@@ -80,6 +83,7 @@ export function SupplierFormDialog({
             ? String(editData.paymentTermsDays)
             : "",
         phone: editData.phone ?? "",
+        status: editData.status ?? "active",
       });
     } else if (!editId) {
       setForm(emptyForm);
@@ -139,7 +143,7 @@ export function SupplierFormDialog({
       phone: form.phone || undefined,
     };
     if (isEdit && editId) {
-      updateMutation.mutate({ ...payload, id: editId });
+      updateMutation.mutate({ ...payload, id: editId, status: form.status });
     } else {
       createMutation.mutate(payload);
     }
@@ -250,6 +254,26 @@ export function SupplierFormDialog({
                 placeholder="e.g. 30"
               />
             </div>
+            {isEdit && (
+              <div className="space-y-2">
+                <Label htmlFor="sup-status">Status</Label>
+                <select
+                  id="sup-status"
+                  value={form.status}
+                  onChange={(e) =>
+                    updateField(
+                      "status",
+                      e.target.value as "active" | "inactive" | "suspended"
+                    )
+                  }
+                  className="border-input bg-background flex h-8 w-full rounded-none border px-2.5 py-1 text-xs outline-none"
+                >
+                  <option value="active">Active</option>
+                  <option value="suspended">Suspended</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="sup-notes">Notes</Label>

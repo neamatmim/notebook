@@ -26,12 +26,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { queryClient, orpc } from "@/utils/orpc";
 
-interface StockAdjustDialogProps {
+interface MarkDamagedDialogProps {
   onClose: () => void;
   open: boolean;
 }
 
-export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
+export function MarkDamagedDialog({ open, onClose }: MarkDamagedDialogProps) {
   const [productId, setProductId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -48,11 +48,13 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
     orpc.inventory.locations.list.queryOptions({})
   );
 
-  const adjustMutation = useMutation(
-    orpc.inventory.stock.adjust.mutationOptions({
+  const markDamagedMutation = useMutation(
+    orpc.inventory.stock.markDamaged.mutationOptions({
       onError: (err) => toast.error(err.message),
       onSuccess: (data) => {
-        toast.success(`Stock adjusted. New quantity: ${data.newQuantity}`);
+        toast.success(
+          `Goods marked as damaged. New quantity: ${data.newQuantity}`
+        );
         queryClient.invalidateQueries({
           queryKey: orpc.inventory.stock.movements
             .queryOptions({ input: {} })
@@ -75,12 +77,16 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    adjustMutation.mutate({
+    if (!productId) {
+      toast.error("Please select a product");
+      return;
+    }
+    markDamagedMutation.mutate({
       locationId: locationId || undefined,
       notes: notes || undefined,
       productId,
       quantity: Number(quantity),
-      reason,
+      reason: reason || undefined,
     });
   };
 
@@ -95,22 +101,22 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Stock Adjustment</DialogTitle>
+          <DialogTitle>Mark Goods as Damaged</DialogTitle>
           <DialogDescription>
-            Adjust stock levels for a product. Use positive numbers to add stock
-            and negative numbers to remove.
+            Record damaged or written-off stock. The quantity will be deducted
+            and a loss journal entry will be posted automatically.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="adj-product">
+            <Label htmlFor="dmg-product">
               Product <span className="text-red-500">*</span>
             </Label>
             <Select
               value={productId}
               onValueChange={(v) => setProductId(v ?? "")}
             >
-              <SelectTrigger id="adj-product">
+              <SelectTrigger id="dmg-product">
                 <SelectValue placeholder="Select a product" />
               </SelectTrigger>
               <SelectContent>
@@ -123,14 +129,14 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="adj-location">Location</Label>
+            <Label htmlFor="dmg-location">Location</Label>
             <Select
               value={locationId || "__none__"}
               onValueChange={(v) =>
                 setLocationId(!v || v === "__none__" ? "" : v)
               }
             >
-              <SelectTrigger id="adj-location">
+              <SelectTrigger id="dmg-location">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -144,34 +150,32 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="adj-qty">
-              Quantity <span className="text-red-500">*</span>
+            <Label htmlFor="dmg-qty">
+              Quantity damaged <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="adj-qty"
+              id="dmg-qty"
               type="number"
+              min="1"
               required
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
-              placeholder="e.g., 10 or -5"
+              placeholder="e.g., 3"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="adj-reason">
-              Reason <span className="text-red-500">*</span>
-            </Label>
+            <Label htmlFor="dmg-reason">Reason</Label>
             <Input
-              id="adj-reason"
-              required
+              id="dmg-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g., Physical count correction"
+              placeholder="e.g., Water damage, Broken in transit"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="adj-notes">Notes</Label>
+            <Label htmlFor="dmg-notes">Notes</Label>
             <Textarea
-              id="adj-notes"
+              id="dmg-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional notes..."
@@ -183,13 +187,13 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
             </Button>
             <Button
               type="submit"
-              disabled={adjustMutation.isPending}
-              className="bg-blue-600 hover:bg-blue-700"
+              disabled={markDamagedMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
             >
-              {adjustMutation.isPending && (
+              {markDamagedMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Adjust Stock
+              Mark as Damaged
             </Button>
           </DialogFooter>
         </form>

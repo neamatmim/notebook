@@ -17,6 +17,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { queryClient, orpc } from "@/utils/orpc";
 
@@ -264,36 +271,46 @@ export function ProductFormDialog({
 
               <div className="space-y-2">
                 <Label htmlFor="categoryId">Category</Label>
-                <select
-                  id="categoryId"
-                  value={form.categoryId}
-                  onChange={(e) => updateField("categoryId", e.target.value)}
-                  className="border-input bg-background flex h-8 w-full rounded-none border px-2.5 py-1 text-xs outline-none"
+                <Select
+                  value={form.categoryId || "__none__"}
+                  onValueChange={(v) =>
+                    updateField("categoryId", !v || v === "__none__" ? "" : v)
+                  }
                 >
-                  <option value="">No category</option>
-                  {(categoriesQuery.data?.items ?? []).map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="categoryId">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No category</SelectItem>
+                    {(categoriesQuery.data?.items ?? []).map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="supplierId">Supplier</Label>
-                <select
-                  id="supplierId"
-                  value={form.supplierId}
-                  onChange={(e) => updateField("supplierId", e.target.value)}
-                  className="border-input bg-background flex h-8 w-full rounded-none border px-2.5 py-1 text-xs outline-none"
+                <Select
+                  value={form.supplierId || "__none__"}
+                  onValueChange={(v) =>
+                    updateField("supplierId", !v || v === "__none__" ? "" : v)
+                  }
                 >
-                  <option value="">No supplier</option>
-                  {(suppliersQuery.data?.items ?? []).map((sup) => (
-                    <option key={sup.id} value={sup.id}>
-                      {sup.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="supplierId">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No supplier</SelectItem>
+                    {(suppliersQuery.data?.items ?? []).map((sup) => (
+                      <SelectItem key={sup.id} value={sup.id}>
+                        {sup.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
@@ -308,20 +325,23 @@ export function ProductFormDialog({
 
               <div className="space-y-2">
                 <Label htmlFor="unit">Unit</Label>
-                <select
-                  id="unit"
+                <Select
                   value={form.unit}
-                  onChange={(e) => updateField("unit", e.target.value)}
-                  className="border-input bg-background flex h-8 w-full rounded-none border px-2.5 py-1 text-xs outline-none"
+                  onValueChange={(v) => updateField("unit", v ?? "pcs")}
                 >
-                  <option value="pcs">Pieces</option>
-                  <option value="kg">Kilograms</option>
-                  <option value="lbs">Pounds</option>
-                  <option value="m">Meters</option>
-                  <option value="ft">Feet</option>
-                  <option value="box">Box</option>
-                  <option value="pack">Pack</option>
-                </select>
+                  <SelectTrigger id="unit">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pcs">Pieces</SelectItem>
+                    <SelectItem value="kg">Kilograms</SelectItem>
+                    <SelectItem value="lbs">Pounds</SelectItem>
+                    <SelectItem value="m">Meters</SelectItem>
+                    <SelectItem value="ft">Feet</SelectItem>
+                    <SelectItem value="box">Box</SelectItem>
+                    <SelectItem value="pack">Pack</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

@@ -26,33 +26,37 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { queryClient, orpc } from "@/utils/orpc";
 
-interface StockAdjustDialogProps {
+interface BatchCreateDialogProps {
   onClose: () => void;
   open: boolean;
 }
 
-export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
+export function BatchCreateDialog({ open, onClose }: BatchCreateDialogProps) {
   const [productId, setProductId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [quantity, setQuantity] = useState("");
-  const [reason, setReason] = useState("");
+  const [unitCost, setUnitCost] = useState("0");
+  const [lotNumber, setLotNumber] = useState("");
+  const [expirationDate, setExpirationDate] = useState("");
   const [notes, setNotes] = useState("");
 
   const productsQuery = useQuery(
-    orpc.inventory.products.list.queryOptions({
-      input: { limit: 100 },
-    })
+    orpc.inventory.products.list.queryOptions({ input: { limit: 100 } })
   );
-
   const locationsQuery = useQuery(
     orpc.inventory.locations.list.queryOptions({})
   );
 
-  const adjustMutation = useMutation(
-    orpc.inventory.stock.adjust.mutationOptions({
+  const createMutation = useMutation(
+    orpc.inventory.stock.createBatch.mutationOptions({
       onError: (err) => toast.error(err.message),
-      onSuccess: (data) => {
-        toast.success(`Stock adjusted. New quantity: ${data.newQuantity}`);
+      onSuccess: () => {
+        toast.success("Batch created and stock updated");
+        queryClient.invalidateQueries({
+          queryKey: orpc.inventory.stock.batches
+            .queryOptions({ input: {} })
+            .queryKey.slice(0, 2),
+        });
         queryClient.invalidateQueries({
           queryKey: orpc.inventory.stock.movements
             .queryOptions({ input: {} })
@@ -66,7 +70,9 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
         setProductId("");
         setLocationId("");
         setQuantity("");
-        setReason("");
+        setUnitCost("0");
+        setLotNumber("");
+        setExpirationDate("");
         setNotes("");
         onClose();
       },
@@ -75,12 +81,20 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    adjustMutation.mutate({
+    if (!productId) {
+      toast.error("Please select a product");
+      return;
+    }
+    createMutation.mutate({
+      expirationDate: expirationDate
+        ? new Date(expirationDate).toISOString()
+        : undefined,
       locationId: locationId || undefined,
+      lotNumber: lotNumber || undefined,
       notes: notes || undefined,
       productId,
       quantity: Number(quantity),
-      reason,
+      unitCost: unitCost || "0",
     });
   };
 
@@ -95,22 +109,22 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Stock Adjustment</DialogTitle>
+          <DialogTitle>New Batch / Lot</DialogTitle>
           <DialogDescription>
-            Adjust stock levels for a product. Use positive numbers to add stock
-            and negative numbers to remove.
+            Manually receive stock into a new batch. Stock levels will be
+            updated immediately.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="adj-product">
+            <Label htmlFor="batch-product">
               Product <span className="text-red-500">*</span>
             </Label>
             <Select
               value={productId}
               onValueChange={(v) => setProductId(v ?? "")}
             >
-              <SelectTrigger id="adj-product">
+              <SelectTrigger id="batch-product">
                 <SelectValue placeholder="Select a product" />
               </SelectTrigger>
               <SelectContent>
@@ -122,59 +136,83 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
               </SelectContent>
             </Select>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="batch-qty">
+                Quantity <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="batch-qty"
+                type="number"
+                min="1"
+                required
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="e.g., 100"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="batch-cost">Unit Cost ($)</Label>
+              <Input
+                id="batch-cost"
+                type="number"
+                min="0"
+                step="0.0001"
+                value={unitCost}
+                onChange={(e) => setUnitCost(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+          </div>
           <div className="space-y-2">
-            <Label htmlFor="adj-location">Location</Label>
+            <Label htmlFor="batch-location">Location</Label>
             <Select
               value={locationId || "__none__"}
               onValueChange={(v) =>
                 setLocationId(!v || v === "__none__" ? "" : v)
               }
             >
-              <SelectTrigger id="adj-location">
+              <SelectTrigger id="batch-location">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">Default</SelectItem>
+                <SelectItem value="__none__">Default (no location)</SelectItem>
                 {(locationsQuery.data ?? []).map((loc) => (
                   <SelectItem key={loc.id} value={loc.id}>
-                    {loc.name}
+                    {loc.name} ({loc.type})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="adj-qty">
-              Quantity <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="adj-qty"
-              type="number"
-              required
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              placeholder="e.g., 10 or -5"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="batch-lot">Lot / Batch Number</Label>
+              <Input
+                id="batch-lot"
+                value={lotNumber}
+                onChange={(e) => setLotNumber(e.target.value)}
+                placeholder="Auto-generated if blank"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="batch-expiry">Expiration Date</Label>
+              <Input
+                id="batch-expiry"
+                type="date"
+                value={expirationDate}
+                onChange={(e) => setExpirationDate(e.target.value)}
+              />
+            </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="adj-reason">
-              Reason <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="adj-reason"
-              required
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g., Physical count correction"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="adj-notes">Notes</Label>
+            <Label htmlFor="batch-notes">Notes</Label>
             <Textarea
-              id="adj-notes"
+              id="batch-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional notes..."
+              rows={2}
             />
           </div>
           <DialogFooter>
@@ -183,13 +221,13 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
             </Button>
             <Button
               type="submit"
-              disabled={adjustMutation.isPending}
+              disabled={createMutation.isPending}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {adjustMutation.isPending && (
+              {createMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Adjust Stock
+              Create Batch
             </Button>
           </DialogFooter>
         </form>

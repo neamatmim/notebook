@@ -22,7 +22,8 @@
     "db:watch": "docker compose up",
     "db:stop": "docker compose stop",
     "db:down": "docker compose down",
-    "seed": "bun run src/seed.ts"
+    "seed": "bun run src/seed.ts",
+    "seed:inventory": "bun run src/seed-inventory.ts"
   },
   "dependencies": {
     "@notebook/env": "workspace:*",

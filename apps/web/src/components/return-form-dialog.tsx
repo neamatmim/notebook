@@ -17,6 +17,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { queryClient, orpc } from "@/utils/orpc";
 
@@ -354,33 +361,41 @@ export function ReturnFormDialog({ open, onClose }: ReturnFormDialogProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Reason</Label>
-                  <select
+                  <Select
                     value={reason}
-                    onChange={(e) => setReason(e.target.value as ReturnReason)}
-                    className="border-input bg-background flex h-8 w-full rounded-none border px-2.5 py-1 text-xs outline-none"
+                    onValueChange={(v) => setReason(v as ReturnReason)}
                   >
-                    {RETURN_REASONS.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RETURN_REASONS.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>
+                          {r.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Location</Label>
-                  <select
+                  <Label>
+                    Location <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
                     value={locationId}
-                    onChange={(e) => setLocationId(e.target.value)}
-                    className="border-input bg-background flex h-8 w-full rounded-none border px-2.5 py-1 text-xs outline-none"
-                    required
+                    onValueChange={(v) => setLocationId(v ?? "")}
                   >
-                    <option value="">Select location</option>
-                    {locationsList.map((loc) => (
-                      <option key={loc.id} value={loc.id}>
-                        {loc.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locationsList.map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>
+                          {loc.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

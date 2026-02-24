@@ -21,7 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { orpc } from "@/utils/orpc";
+
+type MemberStatus = "active" | "resigned" | "suspended";
 
 type KycStatus = "approved" | "pending" | "rejected";
 
@@ -53,11 +56,31 @@ const EMPTY_FORM: InvestorForm = {
   type: "individual",
 };
 
+interface Investor {
+  address: null | string;
+  country: null | string;
+  email: string;
+  id: string;
+  kycStatus: string;
+  name: string;
+  notes: null | string;
+  phone: null | string;
+  taxId: null | string;
+  type: string;
+}
+
 function InvestorsPage() {
   const queryClient = useQueryClient();
   const [kycFilter, setKycFilter] = useState<KycStatus | "all">("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState<InvestorForm>(EMPTY_FORM);
+  const [editInvestor, setEditInvestor] = useState<Investor | null>(null);
+  const [memberStatusTarget, setMemberStatusTarget] = useState<{
+    investorId: string;
+    investorName: string;
+    newStatus: MemberStatus;
+  } | null>(null);
+  const [memberStatusReason, setMemberStatusReason] = useState("");
 
   const { data, isLoading } = useQuery(
     orpc.investment.investors.list.queryOptions({
@@ -94,6 +117,27 @@ function InvestorsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries();
       toast.success("KYC rejected");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const memberStatusMutation = useMutation({
+    ...orpc.investment.membershipFees.members.setStatus.mutationOptions(),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setMemberStatusTarget(null);
+      setMemberStatusReason("");
+      toast.success("Member status updated");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const updateMutation = useMutation({
+    ...orpc.investment.investors.update.mutationOptions(),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setEditInvestor(null);
+      toast.success("Investor updated");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -148,6 +192,7 @@ function InvestorsPage() {
                     <th className="py-2 pr-3 font-medium">Type</th>
                     <th className="py-2 pr-3 font-medium">Country</th>
                     <th className="py-2 pr-3 font-medium">KYC Status</th>
+                    <th className="py-2 pr-3 font-medium">Member Status</th>
                     <th className="py-2 font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -174,7 +219,63 @@ function InvestorsPage() {
                           {investor.kycStatus}
                         </span>
                       </td>
+                      <td className="py-2 pr-3">
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-xs text-yellow-700 hover:text-yellow-900"
+                            onClick={() => {
+                              setMemberStatusTarget({
+                                investorId: investor.id,
+                                investorName: investor.name,
+                                newStatus: "suspended",
+                              });
+                              setMemberStatusReason("");
+                            }}
+                          >
+                            Suspend
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-xs text-red-700 hover:text-red-900"
+                            onClick={() => {
+                              setMemberStatusTarget({
+                                investorId: investor.id,
+                                investorName: investor.name,
+                                newStatus: "resigned",
+                              });
+                              setMemberStatusReason("");
+                            }}
+                          >
+                            Resign
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-xs text-green-700 hover:text-green-900"
+                            onClick={() => {
+                              memberStatusMutation.mutate({
+                                investorId: investor.id,
+                                status: "active",
+                              });
+                            }}
+                          >
+                            Reactivate
+                          </Button>
+                        </div>
+                      </td>
                       <td className="space-x-1 py-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setEditInvestor(investor as unknown as Investor)
+                          }
+                        >
+                          Edit
+                        </Button>
                         {investor.kycStatus === "pending" && (
                           <>
                             <Button
@@ -203,7 +304,7 @@ function InvestorsPage() {
                   {!data?.items.length && (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         className="text-muted-foreground py-8 text-center"
                       >
                         No investors found.
@@ -327,6 +428,193 @@ function InvestorsPage() {
               disabled={createMutation.isPending || !form.name || !form.email}
             >
               {createMutation.isPending ? "Saving…" : "Add Investor"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog
+        open={!!editInvestor}
+        onOpenChange={(open) => !open && setEditInvestor(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Investor</DialogTitle>
+          </DialogHeader>
+          {editInvestor && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Label>Full Name</Label>
+                <Input
+                  defaultValue={editInvestor.name}
+                  onChange={(e) =>
+                    setEditInvestor({ ...editInvestor, name: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input
+                  defaultValue={editInvestor.phone ?? ""}
+                  onChange={(e) =>
+                    setEditInvestor({ ...editInvestor, phone: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <Label>Investor Type</Label>
+                <Select
+                  value={editInvestor.type}
+                  onValueChange={(v) =>
+                    setEditInvestor({
+                      ...editInvestor,
+                      type: v ?? "individual",
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="individual">Individual</SelectItem>
+                    <SelectItem value="corporate">Corporate</SelectItem>
+                    <SelectItem value="institutional">Institutional</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Country</Label>
+                <Input
+                  defaultValue={editInvestor.country ?? ""}
+                  onChange={(e) =>
+                    setEditInvestor({
+                      ...editInvestor,
+                      country: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <Label>Tax ID</Label>
+                <Input
+                  defaultValue={editInvestor.taxId ?? ""}
+                  onChange={(e) =>
+                    setEditInvestor({ ...editInvestor, taxId: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <Label>Address</Label>
+                <Input
+                  defaultValue={editInvestor.address ?? ""}
+                  onChange={(e) =>
+                    setEditInvestor({
+                      ...editInvestor,
+                      address: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="col-span-2">
+                <Label>Notes</Label>
+                <Input
+                  defaultValue={editInvestor.notes ?? ""}
+                  onChange={(e) =>
+                    setEditInvestor({ ...editInvestor, notes: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditInvestor(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={updateMutation.isPending || !editInvestor?.name}
+              onClick={() => {
+                if (!editInvestor) {
+                  return;
+                }
+                updateMutation.mutate({
+                  address: editInvestor.address ?? undefined,
+                  country: editInvestor.country ?? undefined,
+                  id: editInvestor.id,
+                  name: editInvestor.name,
+                  notes: editInvestor.notes ?? undefined,
+                  phone: editInvestor.phone ?? undefined,
+                  taxId: editInvestor.taxId ?? undefined,
+                  type: editInvestor.type as
+                    | "corporate"
+                    | "individual"
+                    | "institutional",
+                });
+              }}
+            >
+              {updateMutation.isPending ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Member Status Dialog */}
+      <Dialog
+        open={!!memberStatusTarget}
+        onOpenChange={(open) => !open && setMemberStatusTarget(null)}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {memberStatusTarget?.newStatus === "suspended"
+                ? "Suspend Member"
+                : "Mark as Resigned"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-muted-foreground text-sm">
+              {memberStatusTarget?.investorName}
+            </p>
+            <div className="space-y-1">
+              <Label>Reason (optional)</Label>
+              <Textarea
+                rows={3}
+                value={memberStatusReason}
+                onChange={(e) => setMemberStatusReason(e.target.value)}
+                placeholder="Reason for status change…"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setMemberStatusTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={
+                memberStatusTarget?.newStatus === "suspended"
+                  ? "destructive"
+                  : "default"
+              }
+              disabled={memberStatusMutation.isPending}
+              onClick={() => {
+                if (!memberStatusTarget) {
+                  return;
+                }
+                memberStatusMutation.mutate({
+                  investorId: memberStatusTarget.investorId,
+                  reason: memberStatusReason || undefined,
+                  status: memberStatusTarget.newStatus,
+                });
+              }}
+            >
+              {memberStatusMutation.isPending
+                ? "Saving…"
+                : memberStatusTarget?.newStatus === "suspended"
+                  ? "Suspend"
+                  : "Confirm Resignation"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -75,6 +75,30 @@ const EMPTY_FORM: ProjectForm = {
   type: "",
 };
 
+interface Project {
+  currency: string;
+  description: null | string;
+  discountRate: null | string;
+  endDate: Date | null;
+  expectedReturnRate: null | string;
+  fundingDeadline: Date | null;
+  hurdleRate: null | string;
+  id: string;
+  maximumInvestment: null | string;
+  minimumInvestment: null | string;
+  name: string;
+  notes: null | string;
+  raisedAmount: string;
+  riskLevel: null | string;
+  startDate: Date | null;
+  status: string;
+  targetAmount: string;
+  type: string;
+}
+
+const toDateStr = (d: Date | null | undefined) =>
+  d ? new Date(d).toISOString().slice(0, 10) : "";
+
 function ProjectsPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">(
@@ -82,6 +106,7 @@ function ProjectsPage() {
   );
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState<ProjectForm>(EMPTY_FORM);
+  const [editProject, setEditProject] = useState<null | Project>(null);
 
   const { data, isLoading } = useQuery(
     orpc.investment.projects.list.queryOptions({
@@ -118,6 +143,16 @@ function ProjectsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries();
       toast.success("Project closed");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const updateMutation = useMutation({
+    ...orpc.investment.projects.update.mutationOptions(),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setEditProject(null);
+      toast.success("Project updated");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -220,6 +255,15 @@ function ProjectsPage() {
                         </span>
                       </td>
                       <td className="space-x-1 py-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setEditProject(project as unknown as Project)
+                          }
+                        >
+                          Edit
+                        </Button>
                         {project.status === "draft" && (
                           <Button
                             size="sm"
@@ -470,6 +514,214 @@ function ProjectsPage() {
               }
             >
               {createMutation.isPending ? "Saving…" : "Create Project"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog
+        open={!!editProject}
+        onOpenChange={(open) => !open && setEditProject(null)}
+      >
+        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Project</DialogTitle>
+          </DialogHeader>
+          {editProject && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label>Project Name</Label>
+                  <Input
+                    defaultValue={editProject.name}
+                    onChange={(e) =>
+                      setEditProject({ ...editProject, name: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Type</Label>
+                  <Select
+                    value={editProject.type}
+                    onValueChange={(v) =>
+                      setEditProject({ ...editProject, type: v ?? "" })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="real_estate">Real Estate</SelectItem>
+                      <SelectItem value="business_venture">
+                        Business Venture
+                      </SelectItem>
+                      <SelectItem value="infrastructure">
+                        Infrastructure
+                      </SelectItem>
+                      <SelectItem value="financial_instrument">
+                        Financial Instrument
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Risk Level</Label>
+                  <Select
+                    value={editProject.riskLevel ?? ""}
+                    onValueChange={(v) =>
+                      setEditProject({ ...editProject, riskLevel: v ?? "" })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select risk" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="very_high">Very High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Expected Return Rate (%)</Label>
+                  <Input
+                    type="number"
+                    defaultValue={editProject.expectedReturnRate ?? ""}
+                    onChange={(e) =>
+                      setEditProject({
+                        ...editProject,
+                        expectedReturnRate: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Hurdle Rate (%)</Label>
+                  <Input
+                    type="number"
+                    defaultValue={editProject.hurdleRate ?? ""}
+                    onChange={(e) =>
+                      setEditProject({
+                        ...editProject,
+                        hurdleRate: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Min Investment ($)</Label>
+                  <Input
+                    type="number"
+                    defaultValue={editProject.minimumInvestment ?? ""}
+                    onChange={(e) =>
+                      setEditProject({
+                        ...editProject,
+                        minimumInvestment: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Max Investment ($)</Label>
+                  <Input
+                    type="number"
+                    defaultValue={editProject.maximumInvestment ?? ""}
+                    onChange={(e) =>
+                      setEditProject({
+                        ...editProject,
+                        maximumInvestment: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Start Date</Label>
+                  <Input
+                    type="date"
+                    defaultValue={toDateStr(editProject.startDate)}
+                    onChange={(e) =>
+                      setEditProject({
+                        ...editProject,
+                        startDate: e.target.value
+                          ? new Date(e.target.value)
+                          : null,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>End Date</Label>
+                  <Input
+                    type="date"
+                    defaultValue={toDateStr(editProject.endDate)}
+                    onChange={(e) =>
+                      setEditProject({
+                        ...editProject,
+                        endDate: e.target.value
+                          ? new Date(e.target.value)
+                          : null,
+                      })
+                    }
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label>Description</Label>
+                  <Input
+                    defaultValue={editProject.description ?? ""}
+                    onChange={(e) =>
+                      setEditProject({
+                        ...editProject,
+                        description: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label>Notes</Label>
+                  <Input
+                    defaultValue={editProject.notes ?? ""}
+                    onChange={(e) =>
+                      setEditProject({ ...editProject, notes: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditProject(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={updateMutation.isPending || !editProject?.name}
+              onClick={() => {
+                if (!editProject) {
+                  return;
+                }
+                updateMutation.mutate({
+                  description: editProject.description ?? undefined,
+                  endDate: editProject.endDate
+                    ? toDateStr(editProject.endDate)
+                    : undefined,
+                  expectedReturnRate:
+                    editProject.expectedReturnRate ?? undefined,
+                  hurdleRate: editProject.hurdleRate ?? undefined,
+                  id: editProject.id,
+                  maximumInvestment: editProject.maximumInvestment ?? undefined,
+                  minimumInvestment: editProject.minimumInvestment ?? undefined,
+                  name: editProject.name,
+                  notes: editProject.notes ?? undefined,
+                  riskLevel: (editProject.riskLevel as RiskLevel) ?? undefined,
+                  startDate: editProject.startDate
+                    ? toDateStr(editProject.startDate)
+                    : undefined,
+                  type: editProject.type as ProjectType,
+                });
+              }}
+            >
+              {updateMutation.isPending ? "Saving…" : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

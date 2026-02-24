@@ -2,7 +2,7 @@ import type { FormEvent } from "react";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,12 @@ interface POReceiveDialogProps {
 
 export function POReceiveDialog({ poId, onClose }: POReceiveDialogProps) {
   const [receivedQtys, setReceivedQtys] = useState<Record<string, string>>({});
+  const [expirationDates, setExpirationDates] = useState<
+    Record<string, string>
+  >({});
+  const [lotNumbers, setLotNumbers] = useState<Record<string, string>>({});
   const [locationId, setLocationId] = useState<string>("");
+  const prevPoIdRef = useRef<string | null>(null);
 
   const locationsQuery = useQuery(
     orpc.inventory.locations.list.queryOptions({})
@@ -47,6 +52,15 @@ export function POReceiveDialog({ poId, onClose }: POReceiveDialogProps) {
   );
 
   const po = poQuery.data;
+
+  useEffect(() => {
+    if (poId && poId !== prevPoIdRef.current) {
+      prevPoIdRef.current = poId;
+      setLocationId("");
+      setLotNumbers({});
+      setExpirationDates({});
+    }
+  }, [poId]);
 
   useEffect(() => {
     if (po?.items) {
@@ -98,7 +112,11 @@ export function POReceiveDialog({ poId, onClose }: POReceiveDialogProps) {
     }
     const items = po.items
       .map((item) => ({
+        expirationDate: expirationDates[item.id]
+          ? new Date(expirationDates[item.id]).toISOString()
+          : undefined,
         itemId: item.id,
+        lotNumber: lotNumbers[item.id] || undefined,
         receivedQuantity: Number(receivedQtys[item.id] ?? 0),
       }))
       .filter((item) => item.receivedQuantity > 0);
@@ -124,7 +142,7 @@ export function POReceiveDialog({ poId, onClose }: POReceiveDialogProps) {
         }
       }}
     >
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Receive Purchase Order</DialogTitle>
           <DialogDescription>
@@ -141,13 +159,18 @@ export function POReceiveDialog({ poId, onClose }: POReceiveDialogProps) {
             <div className="space-y-1">
               <Label>Destination Location</Label>
               <Select
-                value={locationId}
-                onValueChange={(v) => setLocationId(v ?? "")}
+                value={locationId || "__none__"}
+                onValueChange={(v) =>
+                  setLocationId(!v || v === "__none__" ? "" : v)
+                }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Main warehouse (no location)" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none__">
+                    Main warehouse (no location)
+                  </SelectItem>
                   {locations.map((loc) => (
                     <SelectItem key={loc.id} value={loc.id}>
                       {loc.name} ({loc.type})
@@ -182,6 +205,36 @@ export function POReceiveDialog({ poId, onClose }: POReceiveDialogProps) {
                         value={receivedQtys[item.id] ?? "0"}
                         onChange={(e) =>
                           setReceivedQtys((prev) => ({
+                            ...prev,
+                            [item.id]: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="w-32">
+                      <Label className="text-muted-foreground text-xs">
+                        Lot # (optional)
+                      </Label>
+                      <Input
+                        value={lotNumbers[item.id] ?? ""}
+                        onChange={(e) =>
+                          setLotNumbers((prev) => ({
+                            ...prev,
+                            [item.id]: e.target.value,
+                          }))
+                        }
+                        placeholder="Auto"
+                      />
+                    </div>
+                    <div className="w-36">
+                      <Label className="text-muted-foreground text-xs">
+                        Expiry Date (optional)
+                      </Label>
+                      <Input
+                        type="date"
+                        value={expirationDates[item.id] ?? ""}
+                        onChange={(e) =>
+                          setExpirationDates((prev) => ({
                             ...prev,
                             [item.id]: e.target.value,
                           }))

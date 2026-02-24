@@ -30,6 +30,8 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../index";
 import {
+  postCOGSJournalEntry,
+  postCOGSReversalJournalEntry,
   postDueCollectionJournalEntry,
   postReturnJournalEntry,
   postSaleJournalEntry,
@@ -468,6 +470,7 @@ export const posRouter = {
             .select({ dueBalance: customers.dueBalance, id: customers.id })
             .from(customers)
             .where(eq(customers.id, input.customerId))
+            .for("update")
             .limit(1);
 
           if (!cust) {
@@ -668,10 +671,69 @@ export const posRouter = {
 
         return employee;
       }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.string().uuid() }))
+      .handler(async ({ input }) => {
+        const [employee] = await db
+          .update(employees)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(eq(employees.id, input.id))
+          .returning();
+
+        if (!employee) {
+          throw new ORPCError("NOT_FOUND", { message: "Employee not found" });
+        }
+
+        return employee;
+      }),
   },
 
   // Shifts
   shifts: {
+    list: protectedProcedure
+      .input(paginationSchema)
+      .handler(async ({ input }) => {
+        const [items, totalCountResult] = await Promise.all([
+          db
+            .select({
+              breakMinutes: shifts.breakMinutes,
+              employee: {
+                firstName: employees.firstName,
+                id: employees.id,
+                lastName: employees.lastName,
+              },
+              endTime: shifts.endTime,
+              hoursWorked: shifts.hoursWorked,
+              id: shifts.id,
+              location: {
+                id: locations.id,
+                name: locations.name,
+              },
+              notes: shifts.notes,
+              startTime: shifts.startTime,
+              totalSales: shifts.totalSales,
+              transactionCount: shifts.transactionCount,
+            })
+            .from(shifts)
+            .leftJoin(employees, eq(shifts.employeeId, employees.id))
+            .leftJoin(locations, eq(shifts.locationId, locations.id))
+            .limit(input.limit)
+            .offset(input.offset)
+            .orderBy(desc(shifts.startTime)),
+          db.select({ count: sql<number>`count(*)` }).from(shifts),
+        ]);
+
+        return {
+          items,
+          pagination: {
+            limit: input.limit,
+            offset: input.offset,
+            total: totalCountResult[0]?.count ?? 0,
+          },
+        };
+      }),
+
     current: protectedProcedure
       .input(z.object({ employeeId: z.string().uuid() }))
       .handler(async ({ input }) => {
@@ -757,6 +819,8 @@ export const posRouter = {
           let checkoutDueCollectionId: string | null = null;
 
           let subtotal = 0;
+          // eslint-disable-next-line prefer-const
+          let totalCogs = 0;
           for (const item of input.items) {
             const itemTotal =
               Number(item.unitPrice) * item.quantity -
@@ -775,6 +839,12 @@ export const posRouter = {
           }
 
           const changeGiven = Math.max(0, amountPaid - totalAmount);
+
+          if (amountPaid < totalAmount - 0.005) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: `Payment total ($${amountPaid.toFixed(2)}) does not cover the sale amount ($${totalAmount.toFixed(2)}).`,
+            });
+          }
 
           const [sale] = await tx
             .insert(sales)
@@ -842,9 +912,16 @@ export const posRouter = {
                   eq(stockLevels.locationId, input.locationId)
                 )
               )
+              .for("update")
               .limit(1);
 
-            if (stockLevel.length > 0) {
+            if (stockLevel.length === 0) {
+              throw new ORPCError("BAD_REQUEST", {
+                message: `No stock record found for this product at the selected location.`,
+              });
+            }
+
+            {
               const currentQuantity = stockLevel[0]!.quantity;
               const newQuantity = Math.max(0, currentQuantity - item.quantity);
 
@@ -873,7 +950,7 @@ export const posRouter = {
               });
 
               if (costMethod === "fifo") {
-                // Consume oldest cost layers first
+                // Consume oldest non-expired cost layers first
                 let qtyToConsume = item.quantity;
                 const layers = await tx
                   .select()
@@ -884,10 +961,21 @@ export const posRouter = {
                       item.variantId
                         ? eq(costLayers.variantId, item.variantId)
                         : sql`${costLayers.variantId} IS NULL`,
-                      sql`${costLayers.remainingQuantity} > 0`
+                      sql`${costLayers.remainingQuantity} > 0`,
+                      sql`(${costLayers.expirationDate} IS NULL OR ${costLayers.expirationDate} > NOW())`
                     )
                   )
                   .orderBy(asc(costLayers.receivedAt));
+
+                const totalAvailable = layers.reduce(
+                  (sum, l) => sum + l.remainingQuantity,
+                  0
+                );
+                if (totalAvailable < item.quantity) {
+                  throw new ORPCError("BAD_REQUEST", {
+                    message: `Insufficient non-expired stock for "${item.productId}". Write off expired batches first.`,
+                  });
+                }
 
                 for (const layer of layers) {
                   if (qtyToConsume <= 0) {
@@ -903,6 +991,7 @@ export const posRouter = {
                       remainingQuantity: layer.remainingQuantity - consume,
                     })
                     .where(eq(costLayers.id, layer.id));
+                  totalCogs += consume * Number(layer.unitCost);
                   qtyToConsume -= consume;
                 }
 
@@ -943,6 +1032,25 @@ export const posRouter = {
                       .where(eq(products.id, item.productId));
                   }
                 }
+              } else if (costMethod !== "none") {
+                // last_cost or weighted_average — use stored cost price
+                let unitCost = 0;
+                if (item.variantId) {
+                  const [variant] = await tx
+                    .select({ costPrice: productVariants.costPrice })
+                    .from(productVariants)
+                    .where(eq(productVariants.id, item.variantId))
+                    .limit(1);
+                  unitCost = Number(variant?.costPrice ?? 0);
+                } else {
+                  const [product] = await tx
+                    .select({ costPrice: products.costPrice })
+                    .from(products)
+                    .where(eq(products.id, item.productId))
+                    .limit(1);
+                  unitCost = Number(product?.costPrice ?? 0);
+                }
+                totalCogs += unitCost * item.quantity;
               }
             }
           }
@@ -972,6 +1080,7 @@ export const posRouter = {
                     eq(giftCards.isActive, true)
                   )
                 )
+                .for("update")
                 .limit(1);
 
               if (!gc) {
@@ -1023,7 +1132,9 @@ export const posRouter = {
             const [cust] = await tx
               .select({ creditBalance: customers.creditBalance })
               .from(customers)
-              .where(eq(customers.id, input.customerId));
+              .where(eq(customers.id, input.customerId))
+              .for("update")
+              .limit(1);
 
             const creditUsed = Number(storeCreditPayment.amount);
             if (!cust || Number(cust.creditBalance) < creditUsed) {
@@ -1133,6 +1244,7 @@ export const posRouter = {
             sale,
             subtotal: subtotal.toString(),
             taxAmount: taxAmount.toString(),
+            totalCogs,
           };
         });
 
@@ -1152,6 +1264,21 @@ export const posRouter = {
               amount: p.amount,
               method: p.method,
             })),
+            context.session.user.id
+          );
+        } catch {
+          // Accounting not configured — sale still succeeded
+        }
+
+        // Post COGS journal entry (DR Cost of Goods Sold, CR Inventory)
+        try {
+          await postCOGSJournalEntry(
+            db,
+            {
+              amount: txResult.totalCogs.toString(),
+              date: txResult.sale!.saleDate,
+              saleId: txResult.sale!.id,
+            },
             context.session.user.id
           );
         } catch {
@@ -1342,6 +1469,117 @@ export const posRouter = {
           },
         };
       }),
+
+    void: protectedProcedure
+      .input(z.object({ id: z.string().uuid(), reason: z.string().optional() }))
+      .handler(async ({ input, context }) => {
+        const txResult = await db.transaction(async (tx) => {
+          const [sale] = await tx
+            .select()
+            .from(sales)
+            .where(eq(sales.id, input.id))
+            .for("update")
+            .limit(1);
+
+          if (!sale) {
+            throw new ORPCError("NOT_FOUND", { message: "Sale not found" });
+          }
+          if (sale.status !== "completed") {
+            throw new ORPCError("BAD_REQUEST", {
+              message: `Cannot void a sale with status "${sale.status}".`,
+            });
+          }
+
+          // Reverse stock for each sale item
+          const items = await tx
+            .select()
+            .from(saleItems)
+            .where(eq(saleItems.saleId, input.id));
+
+          for (const item of items) {
+            const [sl] = await tx
+              .select()
+              .from(stockLevels)
+              .where(
+                and(
+                  eq(stockLevels.productId, item.productId),
+                  item.variantId
+                    ? eq(stockLevels.variantId, item.variantId)
+                    : sql`${stockLevels.variantId} IS NULL`,
+                  eq(stockLevels.locationId, sale.locationId)
+                )
+              )
+              .for("update")
+              .limit(1);
+
+            if (sl) {
+              const newQty = sl.quantity + item.quantity;
+              await tx
+                .update(stockLevels)
+                .set({
+                  availableQuantity: newQty,
+                  lastMovementAt: new Date(),
+                  quantity: newQty,
+                  updatedAt: new Date(),
+                })
+                .where(eq(stockLevels.id, sl.id));
+
+              await tx.insert(stockMovements).values({
+                locationId: sale.locationId,
+                newQuantity: newQty,
+                previousQuantity: sl.quantity,
+                productId: item.productId,
+                quantity: item.quantity,
+                reason: input.reason ?? "Sale voided",
+                referenceId: sale.id,
+                referenceType: "void",
+                type: "adjustment",
+                userId: context.session.user.id,
+                variantId: item.variantId,
+              });
+            }
+          }
+
+          // Reverse customer balances
+          if (sale.customerId) {
+            const saleTotal = Number(sale.totalAmount);
+            await tx
+              .update(customers)
+              .set({
+                loyaltyPoints: sql`GREATEST(0, ${customers.loyaltyPoints} - ${sale.loyaltyPointsEarned ?? 0})`,
+                totalSpent: sql`GREATEST(0, ${customers.totalSpent} - ${saleTotal})`,
+                updatedAt: new Date(),
+              })
+              .where(eq(customers.id, sale.customerId));
+          }
+
+          // Reverse shift totals
+          if (sale.shiftId) {
+            await tx
+              .update(shifts)
+              .set({
+                totalSales: sql`GREATEST(0, ${shifts.totalSales} - ${Number(sale.totalAmount)})`,
+                transactionCount: sql`GREATEST(0, ${shifts.transactionCount} - 1)`,
+                updatedAt: new Date(),
+              })
+              .where(eq(shifts.id, sale.shiftId));
+          }
+
+          const [voided] = await tx
+            .update(sales)
+            .set({
+              notes: input.reason ? `VOIDED: ${input.reason}` : "VOIDED",
+              status: "voided",
+              updatedAt: new Date(),
+            })
+            .where(eq(sales.id, input.id))
+            .returning();
+
+          return voided;
+        });
+
+        return txResult;
+      }),
   },
 
   // Discounts
@@ -1522,6 +1760,7 @@ export const posRouter = {
           }
 
           let totalRefundAmount = 0;
+          let totalRestockCogs = 0;
           for (const item of input.items) {
             const [saleItem] = await tx
               .select()
@@ -1726,6 +1965,25 @@ export const posRouter = {
                   }
                 }
               }
+
+              // Accumulate COGS for accounting reversal (post-FIFO update)
+              if (saleItem.variantId) {
+                const [v] = await tx
+                  .select({ costPrice: productVariants.costPrice })
+                  .from(productVariants)
+                  .where(eq(productVariants.id, saleItem.variantId))
+                  .limit(1);
+                totalRestockCogs +=
+                  item.quantityReturned * Number(v?.costPrice ?? 0);
+              } else {
+                const [p] = await tx
+                  .select({ costPrice: products.costPrice })
+                  .from(products)
+                  .where(eq(products.id, saleItem.productId))
+                  .limit(1);
+                totalRestockCogs +=
+                  item.quantityReturned * Number(p?.costPrice ?? 0);
+              }
             }
           }
 
@@ -1733,7 +1991,9 @@ export const posRouter = {
           if (input.customerId) {
             const saleTotal = Number(originalSale.totalAmount);
             const proportion =
-              saleTotal > 0 ? totalRefundAmount / saleTotal : 0;
+              saleTotal > 0
+                ? Math.min(1, Math.max(0, totalRefundAmount / saleTotal))
+                : 0;
 
             const storeCreditTotal = originalPayments
               .filter((p) => p.method === "store_credit")
@@ -1778,7 +2038,9 @@ export const posRouter = {
           if (gcTransactions.length > 0) {
             const saleTotal = Number(originalSale.totalAmount);
             const proportion =
-              saleTotal > 0 ? totalRefundAmount / saleTotal : 0;
+              saleTotal > 0
+                ? Math.min(1, Math.max(0, totalRefundAmount / saleTotal))
+                : 0;
 
             for (const gct of gcTransactions) {
               const restoreAmt = +(Number(gct.amount) * proportion).toFixed(2);
@@ -1790,6 +2052,7 @@ export const posRouter = {
                 .select({ currentBalance: giftCards.currentBalance })
                 .from(giftCards)
                 .where(eq(giftCards.id, gct.giftCardId))
+                .for("update")
                 .limit(1);
 
               if (!gc) {
@@ -1839,7 +2102,7 @@ export const posRouter = {
               .where(eq(shifts.id, originalSale.shiftId));
           }
 
-          return { originalSale, returnRecord };
+          return { originalSale, returnRecord, totalRestockCogs };
         });
 
         // Post reversal journal entry outside the transaction so accounting
@@ -1858,6 +2121,23 @@ export const posRouter = {
           );
         } catch {
           // Accounting not configured — return still succeeded
+        }
+
+        // Post COGS reversal for restocked items (DR Inventory, CR COGS)
+        if (txResult.totalRestockCogs > 0) {
+          try {
+            await postCOGSReversalJournalEntry(
+              db,
+              {
+                amount: txResult.totalRestockCogs.toString(),
+                date: new Date(),
+                returnId: txResult.returnRecord!.id,
+              },
+              context.session.user.id
+            );
+          } catch {
+            // Accounting not configured — return still succeeded
+          }
         }
 
         return txResult.returnRecord;

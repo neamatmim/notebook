@@ -14,10 +14,17 @@ import { orpc } from "@/utils/orpc";
 
 function ReportsPage() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedInvestorId, setSelectedInvestorId] = useState("");
 
   const { data: projects } = useQuery(
     orpc.investment.projects.list.queryOptions({
       input: { limit: 100, offset: 0 },
+    })
+  );
+
+  const { data: investors } = useQuery(
+    orpc.investment.investors.list.queryOptions({
+      input: { limit: 200, offset: 0 },
     })
   );
 
@@ -33,6 +40,13 @@ function ReportsPage() {
       input: { projectId: selectedProjectId },
     }),
     enabled: !!selectedProjectId,
+  });
+
+  const { data: portfolio, isLoading: portfolioLoading } = useQuery({
+    ...orpc.investment.reports.investorPortfolio.queryOptions({
+      input: { investorId: selectedInvestorId },
+    }),
+    enabled: !!selectedInvestorId,
   });
 
   return (
@@ -302,6 +316,158 @@ function ReportsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Investor Portfolio */}
+      <div className="border-t pt-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Investor Portfolio</h2>
+          <Select
+            value={selectedInvestorId || "__none__"}
+            onValueChange={(v) =>
+              setSelectedInvestorId(v === "__none__" ? "" : (v ?? ""))
+            }
+          >
+            <SelectTrigger className="w-64">
+              <SelectValue placeholder="Select an investor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Select investor</SelectItem>
+              {investors?.items.map((inv) => (
+                <SelectItem key={inv.id} value={inv.id}>
+                  {inv.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {!selectedInvestorId && (
+          <p className="text-muted-foreground py-8 text-center">
+            Select an investor to view their portfolio.
+          </p>
+        )}
+
+        {selectedInvestorId && portfolioLoading && (
+          <p className="text-muted-foreground py-8 text-center">Loading…</p>
+        )}
+
+        {portfolio && (
+          <>
+            <div className="mb-4 grid grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Total Invested
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    ${portfolio.totalInvested.toLocaleString()}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Total Returns
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    ${portfolio.totalReturns.toLocaleString()}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Portfolio ROI
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div
+                    className={`text-2xl font-bold ${portfolio.portfolioROI >= 0 ? "text-green-600" : "text-red-600"}`}
+                  >
+                    {portfolio.portfolioROI.toFixed(2)}%
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Investments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left">
+                        <th className="py-2 pr-3 font-medium">Date</th>
+                        <th className="py-2 pr-3 font-medium">Project</th>
+                        <th className="py-2 pr-3 font-medium text-right">
+                          Invested
+                        </th>
+                        <th className="py-2 pr-3 font-medium text-right">
+                          Returns
+                        </th>
+                        <th className="py-2 pr-3 font-medium text-right">
+                          ROI
+                        </th>
+                        <th className="py-2 pr-3 font-medium">Equity %</th>
+                        <th className="py-2 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {portfolio.investments.map((inv) => (
+                        <tr key={inv.id} className="hover:bg-muted/40 border-b">
+                          <td className="text-muted-foreground py-2 pr-3">
+                            {new Date(inv.investmentDate).toLocaleDateString()}
+                          </td>
+                          <td className="text-muted-foreground py-2 pr-3 font-mono text-xs">
+                            {inv.projectId.slice(0, 8)}…
+                          </td>
+                          <td className="py-2 pr-3 text-right font-mono">
+                            ${Number(inv.amount).toLocaleString()}
+                          </td>
+                          <td className="py-2 pr-3 text-right font-mono">
+                            ${Number(inv.actualReturnAmount).toLocaleString()}
+                          </td>
+                          <td
+                            className={`py-2 pr-3 text-right font-mono ${inv.roi >= 0 ? "text-green-600" : "text-red-600"}`}
+                          >
+                            {inv.roi.toFixed(2)}%
+                          </td>
+                          <td className="text-muted-foreground py-2 pr-3">
+                            {inv.equityPercentage
+                              ? `${(Number(inv.equityPercentage) * 100).toFixed(2)}%`
+                              : "—"}
+                          </td>
+                          <td className="py-2">
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs capitalize text-gray-700">
+                              {inv.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {portfolio.investments.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={7}
+                            className="text-muted-foreground py-8 text-center"
+                          >
+                            No investments for this investor.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
     </div>
   );
 }

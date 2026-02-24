@@ -6,12 +6,14 @@ import {
 } from "@tanstack/react-router";
 import {
   BarChart2,
+  Clock,
   CreditCard,
   Gift,
   History,
   RotateCcw,
   ShoppingCart,
   Tag,
+  UserCog,
   Users,
 } from "lucide-react";
 
@@ -24,6 +26,8 @@ const navigation = [
   { href: "/pos/returns", icon: RotateCcw, name: "Returns" },
   { href: "/pos/gift-cards", icon: Gift, name: "Gift Cards" },
   { href: "/pos/discounts", icon: Tag, name: "Discounts" },
+  { href: "/pos/employees", icon: UserCog, name: "Employees" },
+  { href: "/pos/shifts", icon: Clock, name: "Shifts" },
   { href: "/pos/reports", icon: BarChart2, name: "Reports" },
 ] as const;
 

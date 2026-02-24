@@ -480,7 +480,11 @@ function ReportsPage() {
                         <span className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700">
                           Balanced ✓
                         </span>
-                      ) : null;
+                      ) : (
+                        <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">
+                          ⚠ Out of Balance ({Math.abs(a - (l + e)).toFixed(2)})
+                        </span>
+                      );
                     })()}
                   </div>
                 </div>

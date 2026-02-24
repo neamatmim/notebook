@@ -47,10 +47,21 @@ const EMPTY_FORM: ShareClassForm = {
   votingRights: true,
 };
 
+interface EditSc {
+  authorizedShares: null | number;
+  dividendPriority: number;
+  id: string;
+  name: string;
+  notes: null | string;
+  parValue: null | string;
+  votingRights: boolean;
+}
+
 function ShareClassesPage() {
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState<ShareClassForm>(EMPTY_FORM);
+  const [editSc, setEditSc] = useState<EditSc | null>(null);
 
   const { data, isLoading } = useQuery(
     orpc.investment.shareClasses.list.queryOptions()
@@ -64,6 +75,16 @@ function ShareClassesPage() {
       setCreateOpen(false);
       setForm(EMPTY_FORM);
       toast.success("Share class created");
+    },
+  });
+
+  const updateMutation = useMutation({
+    ...orpc.investment.shareClasses.update.mutationOptions(),
+    onError: (err) => toast.error(err.message),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setEditSc(null);
+      toast.success("Share class updated");
     },
   });
 
@@ -107,6 +128,7 @@ function ShareClassesPage() {
                     <th className="py-2 pr-3 font-medium">Issued</th>
                     <th className="py-2 pr-3 font-medium">Available</th>
                     <th className="py-2 pr-3 font-medium">Voting</th>
+                    <th className="py-2 pr-3 font-medium">Actions</th>
                     <th className="py-2 pr-3 font-medium">Progress</th>
                   </tr>
                 </thead>
@@ -146,6 +168,25 @@ function ShareClassesPage() {
                           >
                             {sc.votingRights ? "Yes" : "No"}
                           </span>
+                        </td>
+                        <td className="py-2 pr-3">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              setEditSc({
+                                authorizedShares: sc.authorizedShares,
+                                dividendPriority: sc.dividendPriority,
+                                id: sc.id,
+                                name: sc.name,
+                                notes: sc.notes,
+                                parValue: sc.parValue,
+                                votingRights: sc.votingRights,
+                              })
+                            }
+                          >
+                            Edit
+                          </Button>
                         </td>
                         <td className="py-2 pr-3">
                           {authorized > 0 ? (
@@ -307,6 +348,116 @@ function ShareClassesPage() {
               disabled={createMutation.isPending || !form.name || !form.code}
             >
               {createMutation.isPending ? "Saving…" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editSc} onOpenChange={(open) => !open && setEditSc(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Share Class</DialogTitle>
+          </DialogHeader>
+          {editSc && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Label>Name</Label>
+                <Input
+                  defaultValue={editSc.name}
+                  onChange={(e) =>
+                    setEditSc({ ...editSc, name: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <Label>Par Value ($)</Label>
+                <Input
+                  type="number"
+                  defaultValue={editSc.parValue ?? ""}
+                  onChange={(e) =>
+                    setEditSc({ ...editSc, parValue: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <Label>Authorized Shares</Label>
+                <Input
+                  type="number"
+                  defaultValue={editSc.authorizedShares ?? ""}
+                  onChange={(e) =>
+                    setEditSc({
+                      ...editSc,
+                      authorizedShares: e.target.value
+                        ? Number(e.target.value)
+                        : null,
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <Label>Dividend Priority</Label>
+                <Input
+                  type="number"
+                  defaultValue={editSc.dividendPriority}
+                  onChange={(e) =>
+                    setEditSc({
+                      ...editSc,
+                      dividendPriority: Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <Label>Voting Rights</Label>
+                <Select
+                  value={editSc.votingRights ? "yes" : "no"}
+                  onValueChange={(v) =>
+                    setEditSc({ ...editSc, votingRights: v === "yes" })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="yes">Yes</SelectItem>
+                    <SelectItem value="no">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
+                <Label>Notes</Label>
+                <Input
+                  defaultValue={editSc.notes ?? ""}
+                  onChange={(e) =>
+                    setEditSc({ ...editSc, notes: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditSc(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={updateMutation.isPending || !editSc?.name}
+              onClick={() => {
+                if (!editSc) {
+                  return;
+                }
+                updateMutation.mutate({
+                  authorizedShares: editSc.authorizedShares ?? undefined,
+                  dividendPriority: editSc.dividendPriority,
+                  id: editSc.id,
+                  name: editSc.name,
+                  notes: editSc.notes ?? undefined,
+                  parValue: editSc.parValue ?? undefined,
+                  votingRights: editSc.votingRights,
+                });
+              }}
+            >
+              {updateMutation.isPending ? "Saving…" : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

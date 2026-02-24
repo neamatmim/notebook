@@ -1,12 +1,14 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   decimal,
   integer,
   pgEnum,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -24,6 +26,14 @@ export const stockMovementTypeEnum = pgEnum("stock_movement_type", [
   "return",
   "damaged",
   "expired",
+  "cycle_count",
+]);
+
+export const cycleCountStatusEnum = pgEnum("cycle_count_status", [
+  "draft",
+  "in_progress",
+  "completed",
+  "cancelled",
 ]);
 
 export const supplierStatusEnum = pgEnum("supplier_status", [
@@ -146,18 +156,36 @@ export const productVariantsRelations = relations(
   })
 );
 
-export const stockLevels = pgTable("stock_levels", {
-  availableQuantity: integer("available_quantity").default(0),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  id: uuid("id").primaryKey().defaultRandom(),
-  lastMovementAt: timestamp("last_movement_at"),
-  locationId: uuid("location_id"),
-  productId: uuid("product_id").notNull(),
-  quantity: integer("quantity").default(0).notNull(),
-  reservedQuantity: integer("reserved_quantity").default(0),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  variantId: uuid("variant_id"),
-});
+export const stockLevels = pgTable(
+  "stock_levels",
+  {
+    availableQuantity: integer("available_quantity").default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    id: uuid("id").primaryKey().defaultRandom(),
+    lastMovementAt: timestamp("last_movement_at"),
+    locationId: uuid("location_id"),
+    productId: uuid("product_id").notNull(),
+    quantity: integer("quantity").default(0).notNull(),
+    reservedQuantity: integer("reserved_quantity").default(0),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    variantId: uuid("variant_id"),
+  },
+  (t) => [
+    uniqueIndex("sl_prod_no_var_no_loc_uidx")
+      .on(t.productId)
+      .where(sql`${t.variantId} IS NULL AND ${t.locationId} IS NULL`),
+    uniqueIndex("sl_prod_var_no_loc_uidx")
+      .on(t.productId, t.variantId)
+      .where(sql`${t.variantId} IS NOT NULL AND ${t.locationId} IS NULL`),
+    uniqueIndex("sl_prod_no_var_loc_uidx")
+      .on(t.productId, t.locationId)
+      .where(sql`${t.variantId} IS NULL AND ${t.locationId} IS NOT NULL`),
+    uniqueIndex("sl_prod_var_loc_uidx")
+      .on(t.productId, t.variantId, t.locationId)
+      .where(sql`${t.variantId} IS NOT NULL AND ${t.locationId} IS NOT NULL`),
+    check("sl_quantity_non_negative", sql`${t.quantity} >= 0`),
+  ]
+);
 
 export const stockLevelsRelations = relations(stockLevels, ({ one }) => ({
   location: one(locations, {
@@ -246,6 +274,7 @@ export const purchaseOrderPaymentStatusEnum = pgEnum(
 export const purchaseOrders = pgTable("purchase_orders", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   createdBy: text("created_by"),
+  deletedAt: timestamp("deleted_at"),
   expectedDate: timestamp("expected_date"),
   id: uuid("id").primaryKey().defaultRandom(),
   notes: text("notes"),
@@ -352,8 +381,11 @@ export const inventorySettings = pgTable("inventory_settings", {
 
 export const costLayers = pgTable("cost_layers", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  expirationDate: timestamp("expiration_date"),
   id: uuid("id").primaryKey().defaultRandom(),
   locationId: uuid("location_id"),
+  lotNumber: text("lot_number"),
+  notes: text("notes"),
   originalQuantity: integer("original_quantity").notNull(),
   productId: uuid("product_id").notNull(),
   receivedAt: timestamp("received_at").defaultNow().notNull(),
@@ -362,4 +394,72 @@ export const costLayers = pgTable("cost_layers", {
   remainingQuantity: integer("remaining_quantity").notNull(),
   unitCost: decimal("unit_cost", { precision: 10, scale: 2 }).notNull(),
   variantId: uuid("variant_id"),
+});
+
+export const cycleCounts = pgTable("cycle_counts", {
+  cancelledAt: timestamp("cancelled_at"),
+  completedAt: timestamp("completed_at"),
+  countedBy: text("counted_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  locationId: uuid("location_id"),
+  name: text("name").notNull(),
+  notes: text("notes"),
+  startedAt: timestamp("started_at"),
+  status: cycleCountStatusEnum("status").default("draft").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const cycleCountLines = pgTable("cycle_count_lines", {
+  countedQuantity: integer("counted_quantity"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  cycleCountId: uuid("cycle_count_id").notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  locationId: uuid("location_id"),
+  notes: text("notes"),
+  productId: uuid("product_id").notNull(),
+  systemQuantity: integer("system_quantity").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  variance: integer("variance"),
+  variantId: uuid("variant_id"),
+});
+
+export const cycleCountsRelations = relations(cycleCounts, ({ one, many }) => ({
+  lines: many(cycleCountLines),
+  location: one(locations, {
+    fields: [cycleCounts.locationId],
+    references: [locations.id],
+  }),
+}));
+
+export const cycleCountLinesRelations = relations(
+  cycleCountLines,
+  ({ one }) => ({
+    cycleCount: one(cycleCounts, {
+      fields: [cycleCountLines.cycleCountId],
+      references: [cycleCounts.id],
+    }),
+    location: one(locations, {
+      fields: [cycleCountLines.locationId],
+      references: [locations.id],
+    }),
+    product: one(products, {
+      fields: [cycleCountLines.productId],
+      references: [products.id],
+    }),
+    variant: one(productVariants, {
+      fields: [cycleCountLines.variantId],
+      references: [productVariants.id],
+    }),
+  })
+);
+
+export const inventoryAuditLog = pgTable("inventory_audit_log", {
+  action: text("action").notNull(),
+  changes: text("changes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  entityId: text("entity_id").notNull(),
+  entityType: text("entity_type").notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id"),
 });

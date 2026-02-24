@@ -1,5 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { Loader2, Printer } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Printer, XCircle } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { orpc } from "@/utils/orpc";
 import { printReceipt } from "@/utils/print-receipt";
 
@@ -20,10 +24,27 @@ interface SaleViewDialogProps {
 }
 
 export function SaleViewDialog({ saleId, onClose }: SaleViewDialogProps) {
+  const queryClient = useQueryClient();
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [voidReason, setVoidReason] = useState("");
+
   const saleQuery = useQuery(
     orpc.pos.sales.get.queryOptions({
       enabled: Boolean(saleId),
       input: { id: saleId! },
+    })
+  );
+
+  const voidMutation = useMutation(
+    orpc.pos.sales.void.mutationOptions({
+      onError: (err) => toast.error(err.message),
+      onSuccess: () => {
+        toast.success("Sale voided");
+        queryClient.invalidateQueries();
+        setVoidOpen(false);
+        setVoidReason("");
+        onClose();
+      },
     })
   );
 
@@ -69,141 +90,192 @@ export function SaleViewDialog({ saleId, onClose }: SaleViewDialogProps) {
   };
 
   return (
-    <Dialog
-      open={Boolean(saleId)}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          onClose();
-        }
-      }}
-    >
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Sale Details</DialogTitle>
-          <DialogDescription>
-            {s ? `Receipt: ${s.receiptNumber}` : "Loading..."}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog
+        open={Boolean(saleId)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            onClose();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Sale Details</DialogTitle>
+            <DialogDescription>
+              {s ? `Receipt: ${s.receiptNumber}` : "Loading..."}
+            </DialogDescription>
+          </DialogHeader>
 
-        {saleQuery.isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
-        ) : s ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Info label="Receipt #" value={s.receiptNumber} />
-              <Info label="Status" value={s.status} />
-              <Info
-                label="Customer"
-                value={
-                  s.customer?.firstName
-                    ? `${s.customer.firstName} ${s.customer.lastName ?? ""}`.trim()
-                    : "Walk-in"
-                }
-              />
-              <Info label="Location" value={s.location?.name} />
-              <Info
-                label="Date"
-                value={
-                  s.saleDate ? new Date(s.saleDate).toLocaleString() : undefined
-                }
-              />
-              <Info
-                label="Employee"
-                value={
-                  s.employee?.firstName
-                    ? `${s.employee.firstName} ${s.employee.lastName ?? ""}`.trim()
-                    : undefined
-                }
-              />
+          {saleQuery.isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
             </div>
+          ) : s ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Info label="Receipt #" value={s.receiptNumber} />
+                <Info label="Status" value={s.status} />
+                <Info
+                  label="Customer"
+                  value={
+                    s.customer?.firstName
+                      ? `${s.customer.firstName} ${s.customer.lastName ?? ""}`.trim()
+                      : "Walk-in"
+                  }
+                />
+                <Info label="Location" value={s.location?.name} />
+                <Info
+                  label="Date"
+                  value={
+                    s.saleDate
+                      ? new Date(s.saleDate).toLocaleString()
+                      : undefined
+                  }
+                />
+                <Info
+                  label="Employee"
+                  value={
+                    s.employee?.firstName
+                      ? `${s.employee.firstName} ${s.employee.lastName ?? ""}`.trim()
+                      : undefined
+                  }
+                />
+              </div>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Items</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {s.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="bg-muted flex items-center justify-between rounded p-2 text-sm"
-                    >
-                      <div>
-                        <span className="font-medium">
-                          {item.product?.name ?? "Unknown"}
-                        </span>
-                        <span className="text-muted-foreground ml-2 text-xs">
-                          x{item.quantity} @ $
-                          {Number(item.unitPrice).toFixed(2)}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Items</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {s.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="bg-muted flex items-center justify-between rounded p-2 text-sm"
+                      >
+                        <div>
+                          <span className="font-medium">
+                            {item.product?.name ?? "Unknown"}
+                          </span>
+                          <span className="text-muted-foreground ml-2 text-xs">
+                            x{item.quantity} @ $
+                            {Number(item.unitPrice).toFixed(2)}
+                          </span>
+                        </div>
+                        <span className="font-semibold">
+                          ${Number(item.totalPrice).toFixed(2)}
                         </span>
                       </div>
-                      <span className="font-semibold">
-                        ${Number(item.totalPrice).toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Payments</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {s.payments.map((payment) => (
-                    <div
-                      key={payment.id}
-                      className="bg-muted flex items-center justify-between rounded p-2 text-sm"
-                    >
-                      <span className="capitalize">
-                        {payment.method.replaceAll("_", " ")}
-                      </span>
-                      <span className="font-semibold">
-                        ${Number(payment.amount).toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Payments</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {s.payments.map((payment) => (
+                      <div
+                        key={payment.id}
+                        className="bg-muted flex items-center justify-between rounded p-2 text-sm"
+                      >
+                        <span className="capitalize">
+                          {payment.method.replaceAll("_", " ")}
+                        </span>
+                        <span className="font-semibold">
+                          ${Number(payment.amount).toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
-            <div className="space-y-1 border-t pt-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>${Number(s.subtotal).toFixed(2)}</span>
-              </div>
-              {Number(s.discountAmount) > 0 && (
-                <div className="flex justify-between text-red-600">
-                  <span>Discount</span>
-                  <span>-${Number(s.discountAmount).toFixed(2)}</span>
+              <div className="space-y-1 border-t pt-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>${Number(s.subtotal).toFixed(2)}</span>
                 </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Tax</span>
-                <span>${Number(s.taxAmount).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-semibold text-base border-t pt-1">
-                <span>Total</span>
-                <span>${Number(s.totalAmount).toFixed(2)}</span>
+                {Number(s.discountAmount) > 0 && (
+                  <div className="flex justify-between text-red-600">
+                    <span>Discount</span>
+                    <span>-${Number(s.discountAmount).toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Tax</span>
+                  <span>${Number(s.taxAmount).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-base border-t pt-1">
+                  <span>Total</span>
+                  <span>${Number(s.totalAmount).toFixed(2)}</span>
+                </div>
               </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {s && (
+          {s && (
+            <DialogFooter>
+              {s.status === "completed" && (
+                <Button variant="destructive" onClick={() => setVoidOpen(true)}>
+                  <XCircle className="mr-2 h-4 w-4" />
+                  Void Sale
+                </Button>
+              )}
+              <Button variant="outline" onClick={handlePrint}>
+                <Printer className="mr-2 h-4 w-4" />
+                Print Receipt
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Void Confirmation Dialog */}
+      <Dialog open={voidOpen} onOpenChange={setVoidOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Void Sale</DialogTitle>
+            <DialogDescription>
+              This will reverse all stock movements and accounting entries for
+              this sale.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="void-reason">Reason (optional)</Label>
+            <Input
+              id="void-reason"
+              placeholder="Enter reason for voiding…"
+              value={voidReason}
+              onChange={(e) => setVoidReason(e.target.value)}
+            />
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={handlePrint}>
-              <Printer className="mr-2 h-4 w-4" />
-              Print Receipt
+            <Button variant="outline" onClick={() => setVoidOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={voidMutation.isPending}
+              onClick={() => {
+                if (saleId) {
+                  voidMutation.mutate({
+                    id: saleId,
+                    reason: voidReason || undefined,
+                  });
+                }
+              }}
+            >
+              {voidMutation.isPending ? "Voiding…" : "Confirm Void"}
             </Button>
           </DialogFooter>
-        )}
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

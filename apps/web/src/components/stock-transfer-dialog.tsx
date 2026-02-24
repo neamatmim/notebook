@@ -26,47 +26,48 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { queryClient, orpc } from "@/utils/orpc";
 
-interface StockAdjustDialogProps {
+interface StockTransferDialogProps {
   onClose: () => void;
   open: boolean;
 }
 
-export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
+export function StockTransferDialog({
+  open,
+  onClose,
+}: StockTransferDialogProps) {
   const [productId, setProductId] = useState("");
-  const [locationId, setLocationId] = useState("");
+  const [fromLocationId, setFromLocationId] = useState("");
+  const [toLocationId, setToLocationId] = useState("");
   const [quantity, setQuantity] = useState("");
-  const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
 
   const productsQuery = useQuery(
-    orpc.inventory.products.list.queryOptions({
-      input: { limit: 100 },
-    })
+    orpc.inventory.products.list.queryOptions({ input: { limit: 100 } })
   );
 
   const locationsQuery = useQuery(
     orpc.inventory.locations.list.queryOptions({})
   );
 
-  const adjustMutation = useMutation(
-    orpc.inventory.stock.adjust.mutationOptions({
+  const transferMutation = useMutation(
+    orpc.inventory.stock.transfer.mutationOptions({
       onError: (err) => toast.error(err.message),
-      onSuccess: (data) => {
-        toast.success(`Stock adjusted. New quantity: ${data.newQuantity}`);
+      onSuccess: () => {
+        toast.success("Stock transferred successfully");
         queryClient.invalidateQueries({
           queryKey: orpc.inventory.stock.movements
             .queryOptions({ input: {} })
             .queryKey.slice(0, 2),
         });
         queryClient.invalidateQueries({
-          queryKey: orpc.inventory.products.list
+          queryKey: orpc.inventory.stock.locationLevels
             .queryOptions({ input: {} })
             .queryKey.slice(0, 2),
         });
         setProductId("");
-        setLocationId("");
+        setFromLocationId("");
+        setToLocationId("");
         setQuantity("");
-        setReason("");
         setNotes("");
         onClose();
       },
@@ -75,12 +76,24 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    adjustMutation.mutate({
-      locationId: locationId || undefined,
+    if (!productId) {
+      toast.error("Please select a product");
+      return;
+    }
+    if (!fromLocationId) {
+      toast.error("Please select a source location");
+      return;
+    }
+    if (!toLocationId) {
+      toast.error("Please select a destination location");
+      return;
+    }
+    transferMutation.mutate({
+      fromLocationId,
       notes: notes || undefined,
       productId,
       quantity: Number(quantity),
-      reason,
+      toLocationId,
     });
   };
 
@@ -95,22 +108,21 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Stock Adjustment</DialogTitle>
+          <DialogTitle>Transfer Stock</DialogTitle>
           <DialogDescription>
-            Adjust stock levels for a product. Use positive numbers to add stock
-            and negative numbers to remove.
+            Move inventory from one location to another.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="adj-product">
+            <Label htmlFor="tf-product">
               Product <span className="text-red-500">*</span>
             </Label>
             <Select
               value={productId}
               onValueChange={(v) => setProductId(v ?? "")}
             >
-              <SelectTrigger id="adj-product">
+              <SelectTrigger id="tf-product">
                 <SelectValue placeholder="Select a product" />
               </SelectTrigger>
               <SelectContent>
@@ -123,18 +135,17 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="adj-location">Location</Label>
+            <Label htmlFor="tf-from">
+              From Location <span className="text-red-500">*</span>
+            </Label>
             <Select
-              value={locationId || "__none__"}
-              onValueChange={(v) =>
-                setLocationId(!v || v === "__none__" ? "" : v)
-              }
+              value={fromLocationId}
+              onValueChange={(v) => setFromLocationId(v ?? "")}
             >
-              <SelectTrigger id="adj-location">
-                <SelectValue />
+              <SelectTrigger id="tf-from">
+                <SelectValue placeholder="Select source location" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">Default</SelectItem>
                 {(locationsQuery.data ?? []).map((loc) => (
                   <SelectItem key={loc.id} value={loc.id}>
                     {loc.name}
@@ -144,34 +155,43 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="adj-qty">
+            <Label htmlFor="tf-to">
+              To Location <span className="text-red-500">*</span>
+            </Label>
+            <Select
+              value={toLocationId}
+              onValueChange={(v) => setToLocationId(v ?? "")}
+            >
+              <SelectTrigger id="tf-to">
+                <SelectValue placeholder="Select destination location" />
+              </SelectTrigger>
+              <SelectContent>
+                {(locationsQuery.data ?? []).map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="tf-qty">
               Quantity <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="adj-qty"
+              id="tf-qty"
               type="number"
+              min="1"
               required
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
-              placeholder="e.g., 10 or -5"
+              placeholder="e.g., 10"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="adj-reason">
-              Reason <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="adj-reason"
-              required
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g., Physical count correction"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="adj-notes">Notes</Label>
+            <Label htmlFor="tf-notes">Notes</Label>
             <Textarea
-              id="adj-notes"
+              id="tf-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional notes..."
@@ -183,13 +203,13 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
             </Button>
             <Button
               type="submit"
-              disabled={adjustMutation.isPending}
+              disabled={transferMutation.isPending}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {adjustMutation.isPending && (
+              {transferMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Adjust Stock
+              Transfer
             </Button>
           </DialogFooter>
         </form>

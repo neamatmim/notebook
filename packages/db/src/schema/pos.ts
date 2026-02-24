@@ -24,6 +24,7 @@ export const saleStatusEnum = pgEnum("sale_status", [
   "refunded",
   "partially_refunded",
   "cancelled",
+  "voided",
 ]);
 
 export const paymentMethodEnum = pgEnum("payment_method", [

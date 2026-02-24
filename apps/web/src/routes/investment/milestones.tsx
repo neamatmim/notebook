@@ -50,6 +50,18 @@ const EMPTY_FORM: MilestoneForm = {
   projectId: "",
 };
 
+interface EditMilestone {
+  actualCost: null | string;
+  budgetAllocated: null | string;
+  completionPercentage: number;
+  description: null | string;
+  id: string;
+  name: string;
+  notes: null | string;
+  plannedDate: Date | null;
+  status: MilestoneStatus;
+}
+
 function MilestonesPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<MilestoneStatus | "all">(
@@ -58,6 +70,9 @@ function MilestonesPage() {
   const [projectFilter, setProjectFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState<MilestoneForm>(EMPTY_FORM);
+  const [editMilestone, setEditMilestone] = useState<EditMilestone | null>(
+    null
+  );
 
   const { data: projects } = useQuery(
     orpc.investment.projects.list.queryOptions({
@@ -90,6 +105,16 @@ function MilestonesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries();
       toast.success("Milestone completed");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const updateMutation = useMutation({
+    ...orpc.investment.milestones.update.mutationOptions(),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setEditMilestone(null);
+      toast.success("Milestone updated");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -208,7 +233,29 @@ function MilestonesPage() {
                           {milestone.status.replaceAll("_", " ")}
                         </span>
                       </td>
-                      <td className="py-2">
+                      <td className="space-x-1 py-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setEditMilestone({
+                              actualCost: milestone.actualCost,
+                              budgetAllocated: milestone.budgetAllocated,
+                              completionPercentage:
+                                milestone.completionPercentage,
+                              description: milestone.description,
+                              id: milestone.id,
+                              name: milestone.name,
+                              notes: milestone.notes,
+                              plannedDate: milestone.plannedDate
+                                ? new Date(milestone.plannedDate)
+                                : null,
+                              status: milestone.status as MilestoneStatus,
+                            })
+                          }
+                        >
+                          Edit
+                        </Button>
                         {milestone.status !== "completed" && (
                           <Button
                             size="sm"
@@ -344,6 +391,159 @@ function MilestonesPage() {
               }
             >
               {createMutation.isPending ? "Saving…" : "Add Milestone"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog
+        open={!!editMilestone}
+        onOpenChange={(open) => !open && setEditMilestone(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Milestone</DialogTitle>
+          </DialogHeader>
+          {editMilestone && (
+            <div className="space-y-4">
+              <div>
+                <Label>Name</Label>
+                <Input
+                  defaultValue={editMilestone.name}
+                  onChange={(e) =>
+                    setEditMilestone({ ...editMilestone, name: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select
+                  value={editMilestone.status}
+                  onValueChange={(v) =>
+                    setEditMilestone({
+                      ...editMilestone,
+                      status: v as MilestoneStatus,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="delayed">Delayed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Completion %</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    defaultValue={editMilestone.completionPercentage}
+                    onChange={(e) =>
+                      setEditMilestone({
+                        ...editMilestone,
+                        completionPercentage: Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Planned Date</Label>
+                  <Input
+                    type="date"
+                    defaultValue={
+                      editMilestone.plannedDate
+                        ? new Date(editMilestone.plannedDate)
+                            .toISOString()
+                            .slice(0, 10)
+                        : ""
+                    }
+                    onChange={(e) =>
+                      setEditMilestone({
+                        ...editMilestone,
+                        plannedDate: e.target.value
+                          ? new Date(e.target.value)
+                          : null,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Budget ($)</Label>
+                  <Input
+                    type="number"
+                    defaultValue={editMilestone.budgetAllocated ?? ""}
+                    onChange={(e) =>
+                      setEditMilestone({
+                        ...editMilestone,
+                        budgetAllocated: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Actual Cost ($)</Label>
+                  <Input
+                    type="number"
+                    defaultValue={editMilestone.actualCost ?? ""}
+                    onChange={(e) =>
+                      setEditMilestone({
+                        ...editMilestone,
+                        actualCost: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Input
+                  defaultValue={editMilestone.description ?? ""}
+                  onChange={(e) =>
+                    setEditMilestone({
+                      ...editMilestone,
+                      description: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditMilestone(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={updateMutation.isPending || !editMilestone?.name}
+              onClick={() => {
+                if (!editMilestone) {
+                  return;
+                }
+                updateMutation.mutate({
+                  actualCost: editMilestone.actualCost ?? undefined,
+                  budgetAllocated: editMilestone.budgetAllocated ?? undefined,
+                  completionPercentage: editMilestone.completionPercentage,
+                  description: editMilestone.description ?? undefined,
+                  id: editMilestone.id,
+                  name: editMilestone.name,
+                  notes: editMilestone.notes ?? undefined,
+                  plannedDate: editMilestone.plannedDate
+                    ? new Date(editMilestone.plannedDate)
+                        .toISOString()
+                        .slice(0, 10)
+                    : undefined,
+                  status: editMilestone.status,
+                });
+              }}
+            >
+              {updateMutation.isPending ? "Saving…" : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -70,6 +70,7 @@ const EMPTY_TRANSFER: TransferForm = {
 
 function ShareholdersPage() {
   const queryClient = useQueryClient();
+  const [view, setView] = useState<"allotments" | "register">("allotments");
   const [shareClassFilter, setShareClassFilter] = useState<string>("all");
   const [allotOpen, setAllotOpen] = useState(false);
   const [allotForm, setAllotForm] = useState<AllotForm>(EMPTY_ALLOT);
@@ -95,6 +96,11 @@ function ShareholdersPage() {
       input: { kycStatus: "approved", limit: 200, offset: 0 },
     })
   );
+
+  const { data: registerData, isLoading: registerLoading } = useQuery({
+    ...orpc.investment.shareholders.getRegister.queryOptions(),
+    enabled: view === "register",
+  });
 
   const allotMutation = useMutation({
     ...orpc.investment.shareholders.allot.mutationOptions(),
@@ -151,116 +157,235 @@ function ShareholdersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Shareholders</h1>
-        <Button onClick={() => setAllotOpen(true)}>Allot Shares</Button>
+        <div className="flex gap-2">
+          <Button
+            variant={view === "allotments" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("allotments")}
+          >
+            Allotments
+          </Button>
+          <Button
+            variant={view === "register" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("register")}
+          >
+            Share Register
+          </Button>
+          <Button onClick={() => setAllotOpen(true)}>Allot Shares</Button>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant={shareClassFilter === "all" ? "default" : "outline"}
-              onClick={() => setShareClassFilter("all")}
-            >
-              All Classes
-            </Button>
-            {shareClassesData?.items.map((sc) => (
-              <Button
-                key={sc.id}
-                size="sm"
-                variant={shareClassFilter === sc.id ? "default" : "outline"}
-                onClick={() => setShareClassFilter(sc.id)}
-              >
-                {sc.code}
-              </Button>
-            ))}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <p className="text-muted-foreground py-8 text-center">Loading…</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left">
-                    <th className="py-2 pr-3 font-medium">Investor</th>
-                    <th className="py-2 pr-3 font-medium">Email</th>
-                    <th className="py-2 pr-3 font-medium">Share Class</th>
-                    <th className="py-2 pr-3 font-medium">Shares</th>
-                    <th className="py-2 pr-3 font-medium">Consideration</th>
-                    <th className="py-2 pr-3 font-medium">Certificate #</th>
-                    <th className="py-2 pr-3 font-medium">Allotment Date</th>
-                    <th className="py-2 pr-3 font-medium">Status</th>
-                    <th className="py-2 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data?.items.map((row) => (
-                    <tr
-                      key={row.allocationId}
-                      className="hover:bg-muted/40 border-b"
-                    >
-                      <td className="py-2 pr-3 font-medium">
-                        {row.investorName}
-                      </td>
-                      <td className="text-muted-foreground py-2 pr-3">
-                        {row.investorEmail}
-                      </td>
-                      <td className="py-2 pr-3">
-                        <span className="font-mono text-xs">
-                          {row.shareClassCode}
-                        </span>{" "}
-                        {row.shareClassName}
-                      </td>
-                      <td className="py-2 pr-3">
-                        {row.numberOfShares.toLocaleString()}
-                      </td>
-                      <td className="text-muted-foreground py-2 pr-3">
-                        ${Number(row.totalConsideration ?? 0).toLocaleString()}
-                      </td>
-                      <td className="text-muted-foreground py-2 pr-3 font-mono text-xs">
-                        {row.certificateNumber ?? "—"}
-                      </td>
-                      <td className="text-muted-foreground py-2 pr-3">
-                        {new Date(row.allotmentDate).toLocaleDateString()}
-                      </td>
-                      <td className="py-2 pr-3">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_COLORS[row.status as AllotmentStatus] ?? ""}`}
-                        >
-                          {row.status}
+      {/* Share Register View */}
+      {view === "register" && (
+        <Card>
+          <CardHeader />
+          <CardContent>
+            {registerLoading ? (
+              <p className="text-muted-foreground py-8 text-center">Loading…</p>
+            ) : (registerData?.register.length ?? 0) === 0 ? (
+              <p className="text-muted-foreground py-8 text-center">
+                No active shareholdings.
+              </p>
+            ) : (
+              <div className="space-y-6">
+                {registerData?.register.map((member) => (
+                  <div key={member.investorId}>
+                    <div className="mb-2 flex items-center justify-between">
+                      <div>
+                        <span className="font-semibold">
+                          {member.investorName}
                         </span>
-                      </td>
-                      <td className="py-2">
-                        {row.status === "active" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openTransfer(row.allocationId)}
-                          >
-                            Transfer
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {!data?.items.length && (
-                    <tr>
-                      <td
-                        colSpan={9}
-                        className="text-muted-foreground py-8 text-center"
-                      >
-                        No shareholder records found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                        <span className="text-muted-foreground ml-2 text-sm">
+                          {member.email}
+                        </span>
+                      </div>
+                      <div className="text-muted-foreground text-sm">
+                        <span className="font-medium text-foreground">
+                          {member.totalShares.toLocaleString()}
+                        </span>{" "}
+                        total shares ·{" "}
+                        <span className="font-medium text-foreground">
+                          ${member.totalConsideration.toLocaleString()}
+                        </span>{" "}
+                        consideration
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto rounded border">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/40">
+                          <tr className="text-left">
+                            <th className="px-3 py-2 font-medium">
+                              Share Class
+                            </th>
+                            <th className="px-3 py-2 font-medium">Shares</th>
+                            <th className="px-3 py-2 font-medium">
+                              Issue Price
+                            </th>
+                            <th className="px-3 py-2 font-medium">
+                              Consideration
+                            </th>
+                            <th className="px-3 py-2 font-medium">
+                              Certificate #
+                            </th>
+                            <th className="px-3 py-2 font-medium">
+                              Allotment Date
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {member.holdings.map((h, idx) => (
+                            <tr key={idx} className="border-t">
+                              <td className="px-3 py-2">
+                                <span className="mr-1 font-mono text-xs">
+                                  {h.shareClassCode}
+                                </span>
+                                {h.shareClassName}
+                              </td>
+                              <td className="px-3 py-2 font-mono">
+                                {h.numberOfShares.toLocaleString()}
+                              </td>
+                              <td className="text-muted-foreground px-3 py-2">
+                                {h.issuePricePerShare
+                                  ? `$${Number(h.issuePricePerShare).toFixed(4)}`
+                                  : "—"}
+                              </td>
+                              <td className="px-3 py-2 font-mono">
+                                $
+                                {Number(
+                                  h.totalConsideration ?? 0
+                                ).toLocaleString()}
+                              </td>
+                              <td className="text-muted-foreground px-3 py-2 font-mono text-xs">
+                                {h.certificateNumber ?? "—"}
+                              </td>
+                              <td className="text-muted-foreground px-3 py-2">
+                                {new Date(h.allotmentDate).toLocaleDateString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Allotments View */}
+      {view === "allotments" && (
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant={shareClassFilter === "all" ? "default" : "outline"}
+                onClick={() => setShareClassFilter("all")}
+              >
+                All Classes
+              </Button>
+              {shareClassesData?.items.map((sc) => (
+                <Button
+                  key={sc.id}
+                  size="sm"
+                  variant={shareClassFilter === sc.id ? "default" : "outline"}
+                  onClick={() => setShareClassFilter(sc.id)}
+                >
+                  {sc.code}
+                </Button>
+              ))}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <p className="text-muted-foreground py-8 text-center">Loading…</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="py-2 pr-3 font-medium">Investor</th>
+                      <th className="py-2 pr-3 font-medium">Email</th>
+                      <th className="py-2 pr-3 font-medium">Share Class</th>
+                      <th className="py-2 pr-3 font-medium">Shares</th>
+                      <th className="py-2 pr-3 font-medium">Consideration</th>
+                      <th className="py-2 pr-3 font-medium">Certificate #</th>
+                      <th className="py-2 pr-3 font-medium">Allotment Date</th>
+                      <th className="py-2 pr-3 font-medium">Status</th>
+                      <th className="py-2 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data?.items.map((row) => (
+                      <tr
+                        key={row.allocationId}
+                        className="hover:bg-muted/40 border-b"
+                      >
+                        <td className="py-2 pr-3 font-medium">
+                          {row.investorName}
+                        </td>
+                        <td className="text-muted-foreground py-2 pr-3">
+                          {row.investorEmail}
+                        </td>
+                        <td className="py-2 pr-3">
+                          <span className="font-mono text-xs">
+                            {row.shareClassCode}
+                          </span>{" "}
+                          {row.shareClassName}
+                        </td>
+                        <td className="py-2 pr-3">
+                          {row.numberOfShares.toLocaleString()}
+                        </td>
+                        <td className="text-muted-foreground py-2 pr-3">
+                          $
+                          {Number(row.totalConsideration ?? 0).toLocaleString()}
+                        </td>
+                        <td className="text-muted-foreground py-2 pr-3 font-mono text-xs">
+                          {row.certificateNumber ?? "—"}
+                        </td>
+                        <td className="text-muted-foreground py-2 pr-3">
+                          {new Date(row.allotmentDate).toLocaleDateString()}
+                        </td>
+                        <td className="py-2 pr-3">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_COLORS[row.status as AllotmentStatus] ?? ""}`}
+                          >
+                            {row.status}
+                          </span>
+                        </td>
+                        <td className="py-2">
+                          {row.status === "active" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openTransfer(row.allocationId)}
+                            >
+                              Transfer
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {!data?.items.length && (
+                      <tr>
+                        <td
+                          colSpan={9}
+                          className="text-muted-foreground py-8 text-center"
+                        >
+                          No shareholder records found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Allot Shares Dialog */}
       <Dialog open={allotOpen} onOpenChange={setAllotOpen}>

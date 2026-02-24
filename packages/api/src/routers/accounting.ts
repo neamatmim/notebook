@@ -36,6 +36,7 @@ export async function updateAccountBalances(tx: DbOrTx, lines: LineUpdate[]) {
       .select({ id: accounts.id, normalBalance: accounts.normalBalance })
       .from(accounts)
       .where(eq(accounts.id, line.accountId))
+      .for("update")
       .limit(1);
     if (!acct) {
       continue;
@@ -219,33 +220,56 @@ export async function postSaleJournalEntry(
 /**
  * Posts the accounting entry when goods are received from a purchase order.
  *
- * Entry:
- *   DR  Inventory (1200)       — goods received into stock
- *   CR  Accounts Payable (2000) — liability to the supplier
+ * Base entry:
+ *   DR  Inventory (1200)            — goods received into stock
+ *   CR  Accounts Payable (2000)     — liability to the supplier
+ *
+ * If purchaseTax > 0:
+ *   DR  Inventory (1200)            — tax capitalised into inventory cost
+ *   CR  Accounts Payable (2000)
+ *
+ * If shippingCost > 0:
+ *   DR  Freight-In (6500)           — freight expensed separately
+ *   CR  Accounts Payable (2000)
  */
 export async function postPurchaseReceiptJournalEntry(
   tx: DbOrTx,
-  po: { date: Date; id: string; totalCost: string },
+  po: {
+    date: Date;
+    id: string;
+    purchaseTax?: string;
+    shippingCost?: string;
+    totalCost: string;
+  },
   userId: string
 ) {
-  const amount = Number(po.totalCost);
-  if (amount <= 0) {
+  const goodsCost = Number(po.totalCost);
+  const tax = Number(po.purchaseTax ?? 0);
+  const shipping = Number(po.shippingCost ?? 0);
+  const totalAP = goodsCost + tax + shipping;
+
+  if (totalAP <= 0) {
     return;
+  }
+
+  const codesToFetch = ["1200", "2000"];
+  if (shipping > 0) {
+    codesToFetch.push("6500");
   }
 
   const acctRows = await tx
     .select({ code: accounts.code, id: accounts.id })
     .from(accounts)
-    .where(inArray(accounts.code, ["1200", "2000"]));
-
-  if (acctRows.length < 2) {
-    return;
-  } // accounts not seeded — skip silently
+    .where(inArray(accounts.code, codesToFetch));
 
   const byCode: Record<string, string> = {};
   for (const r of acctRows) {
     byCode[r.code] = r.id;
   }
+
+  if (!byCode["1200"] || !byCode["2000"]) {
+    return;
+  } // core accounts not seeded
 
   const [period] = await tx
     .select({ id: accountingPeriods.id })
@@ -260,6 +284,7 @@ export async function postPurchaseReceiptJournalEntry(
     .limit(1);
 
   const entryNumber = makeEntryNumber("JE");
+  const inventoryDebit = goodsCost + tax; // tax capitalised into inventory
 
   const [entry] = await tx
     .insert(journalEntries)
@@ -273,8 +298,8 @@ export async function postPurchaseReceiptJournalEntry(
       sourceId: po.id,
       sourceType: "purchase_order",
       status: "posted",
-      totalCredit: amount.toString(),
-      totalDebit: amount.toString(),
+      totalCredit: totalAP.toString(),
+      totalDebit: totalAP.toString(),
     })
     .returning({ id: journalEntries.id });
 
@@ -287,19 +312,30 @@ export async function postPurchaseReceiptJournalEntry(
   }[] = [
     {
       accountId: byCode["1200"]!,
-      amount: amount.toString(),
+      amount: inventoryDebit.toString(),
       description: null,
       entryId: entry!.id,
       type: "debit",
     },
-    {
-      accountId: byCode["2000"]!,
-      amount: amount.toString(),
+  ];
+
+  if (shipping > 0 && byCode["6500"]) {
+    lines.push({
+      accountId: byCode["6500"]!,
+      amount: shipping.toString(),
       description: null,
       entryId: entry!.id,
-      type: "credit",
-    },
-  ];
+      type: "debit",
+    });
+  }
+
+  lines.push({
+    accountId: byCode["2000"]!,
+    amount: totalAP.toString(),
+    description: null,
+    entryId: entry!.id,
+    type: "credit",
+  });
 
   await tx.insert(journalEntryLines).values(lines);
   await updateAccountBalances(
@@ -390,6 +426,323 @@ export async function postPurchasePaymentJournalEntry(
     },
     {
       accountId: byCode["1000"]!,
+      amount: amount.toString(),
+      description: null,
+      entryId: entry!.id,
+      type: "credit",
+    },
+  ];
+
+  await tx.insert(journalEntryLines).values(lines);
+  await updateAccountBalances(
+    tx,
+    lines.map((l) => ({
+      accountId: l.accountId,
+      amount: l.amount,
+      type: l.type,
+    }))
+  );
+}
+
+/**
+ * Posts the accounting entry for a manual stock adjustment.
+ *
+ * Shrinkage / damage (qty < 0):
+ *   DR  Inventory Variance (6400)  — loss expensed
+ *   CR  Inventory (1200)           — asset reduced
+ *
+ * Positive adjustment (qty > 0):
+ *   DR  Inventory (1200)           — asset increased
+ *   CR  Inventory Variance (6400)  — variance offset
+ */
+export async function postInventoryVarianceJournalEntry(
+  tx: DbOrTx,
+  adjustment: {
+    date: Date;
+    quantity: number;
+    referenceId: string;
+    unitCost: number;
+  },
+  userId: string
+): Promise<void> {
+  const amount = Math.abs(adjustment.quantity) * adjustment.unitCost;
+  if (amount <= 0) {
+    return;
+  }
+
+  const acctRows = await tx
+    .select({ code: accounts.code, id: accounts.id })
+    .from(accounts)
+    .where(inArray(accounts.code, ["1200", "6400"]));
+
+  if (acctRows.length < 2) {
+    return;
+  }
+
+  const byCode: Record<string, string> = {};
+  for (const r of acctRows) {
+    byCode[r.code] = r.id;
+  }
+
+  const [period] = await tx
+    .select({ id: accountingPeriods.id })
+    .from(accountingPeriods)
+    .where(
+      and(
+        eq(accountingPeriods.status, "open"),
+        lte(accountingPeriods.startDate, adjustment.date),
+        gte(accountingPeriods.endDate, adjustment.date)
+      )
+    )
+    .limit(1);
+
+  const entryNumber = makeEntryNumber("JE");
+  const isNegative = adjustment.quantity < 0;
+
+  const [entry] = await tx
+    .insert(journalEntries)
+    .values({
+      createdBy: userId,
+      date: adjustment.date,
+      description: isNegative
+        ? "Inventory Shrinkage / Write-down"
+        : "Inventory Adjustment Gain",
+      entryNumber,
+      periodId: period?.id ?? null,
+      postedAt: new Date(),
+      sourceId: adjustment.referenceId,
+      sourceType: "manual",
+      status: "posted",
+      totalCredit: amount.toString(),
+      totalDebit: amount.toString(),
+    })
+    .returning({ id: journalEntries.id });
+
+  const lines: {
+    accountId: string;
+    amount: string;
+    description: null;
+    entryId: string;
+    type: "credit" | "debit";
+  }[] = isNegative
+    ? [
+        {
+          accountId: byCode["6400"]!,
+          amount: amount.toString(),
+          description: null,
+          entryId: entry!.id,
+          type: "debit",
+        },
+        {
+          accountId: byCode["1200"]!,
+          amount: amount.toString(),
+          description: null,
+          entryId: entry!.id,
+          type: "credit",
+        },
+      ]
+    : [
+        {
+          accountId: byCode["1200"]!,
+          amount: amount.toString(),
+          description: null,
+          entryId: entry!.id,
+          type: "debit",
+        },
+        {
+          accountId: byCode["6400"]!,
+          amount: amount.toString(),
+          description: null,
+          entryId: entry!.id,
+          type: "credit",
+        },
+      ];
+
+  await tx.insert(journalEntryLines).values(lines);
+  await updateAccountBalances(
+    tx,
+    lines.map((l) => ({
+      accountId: l.accountId,
+      amount: l.amount,
+      type: l.type,
+    }))
+  );
+}
+
+/**
+ * Posts the COGS accounting entry when products are sold.
+ *
+ * Entry:
+ *   DR  Cost of Goods Sold (5000) — cost of items sold
+ *   CR  Inventory (1200)          — inventory asset reduced
+ */
+export async function postCOGSJournalEntry(
+  tx: DbOrTx,
+  sale: { amount: string; date: Date; saleId: string },
+  userId: string
+): Promise<void> {
+  const amount = Number(sale.amount);
+  if (amount <= 0) {
+    return;
+  }
+
+  const acctRows = await tx
+    .select({ code: accounts.code, id: accounts.id })
+    .from(accounts)
+    .where(inArray(accounts.code, ["5000", "1200"]));
+
+  if (acctRows.length < 2) {
+    return; // accounts not seeded — skip silently
+  }
+
+  const byCode: Record<string, string> = {};
+  for (const r of acctRows) {
+    byCode[r.code] = r.id;
+  }
+
+  const [period] = await tx
+    .select({ id: accountingPeriods.id })
+    .from(accountingPeriods)
+    .where(
+      and(
+        eq(accountingPeriods.status, "open"),
+        lte(accountingPeriods.startDate, sale.date),
+        gte(accountingPeriods.endDate, sale.date)
+      )
+    )
+    .limit(1);
+
+  const entryNumber = makeEntryNumber("JE");
+
+  const [entry] = await tx
+    .insert(journalEntries)
+    .values({
+      createdBy: userId,
+      date: sale.date,
+      description: "Cost of Goods Sold",
+      entryNumber,
+      periodId: period?.id ?? null,
+      postedAt: new Date(),
+      sourceId: sale.saleId,
+      sourceType: "sale",
+      status: "posted",
+      totalCredit: amount.toString(),
+      totalDebit: amount.toString(),
+    })
+    .returning({ id: journalEntries.id });
+
+  const lines: {
+    accountId: string;
+    amount: string;
+    description: null;
+    entryId: string;
+    type: "credit" | "debit";
+  }[] = [
+    {
+      accountId: byCode["5000"]!,
+      amount: amount.toString(),
+      description: null,
+      entryId: entry!.id,
+      type: "debit",
+    },
+    {
+      accountId: byCode["1200"]!,
+      amount: amount.toString(),
+      description: null,
+      entryId: entry!.id,
+      type: "credit",
+    },
+  ];
+
+  await tx.insert(journalEntryLines).values(lines);
+  await updateAccountBalances(
+    tx,
+    lines.map((l) => ({
+      accountId: l.accountId,
+      amount: l.amount,
+      type: l.type,
+    }))
+  );
+}
+
+/**
+ * Posts the COGS reversal entry when restockable items are returned.
+ *
+ * Entry:
+ *   DR  Inventory (1200)        — inventory asset restored
+ *   CR  Cost of Goods Sold (5000) — COGS reversed
+ */
+export async function postCOGSReversalJournalEntry(
+  tx: DbOrTx,
+  ret: { amount: string; date: Date; returnId: string },
+  userId: string
+): Promise<void> {
+  const amount = Number(ret.amount);
+  if (amount <= 0) {
+    return;
+  }
+
+  const acctRows = await tx
+    .select({ code: accounts.code, id: accounts.id })
+    .from(accounts)
+    .where(inArray(accounts.code, ["5000", "1200"]));
+
+  if (acctRows.length < 2) {
+    return;
+  }
+
+  const byCode: Record<string, string> = {};
+  for (const r of acctRows) {
+    byCode[r.code] = r.id;
+  }
+
+  const [period] = await tx
+    .select({ id: accountingPeriods.id })
+    .from(accountingPeriods)
+    .where(
+      and(
+        eq(accountingPeriods.status, "open"),
+        lte(accountingPeriods.startDate, ret.date),
+        gte(accountingPeriods.endDate, ret.date)
+      )
+    )
+    .limit(1);
+
+  const entryNumber = makeEntryNumber("JE");
+
+  const [entry] = await tx
+    .insert(journalEntries)
+    .values({
+      createdBy: userId,
+      date: ret.date,
+      description: "COGS Reversal — Restocked Return",
+      entryNumber,
+      periodId: period?.id ?? null,
+      postedAt: new Date(),
+      sourceId: ret.returnId,
+      sourceType: "return",
+      status: "posted",
+      totalCredit: amount.toString(),
+      totalDebit: amount.toString(),
+    })
+    .returning({ id: journalEntries.id });
+
+  const lines: {
+    accountId: string;
+    amount: string;
+    description: null;
+    entryId: string;
+    type: "credit" | "debit";
+  }[] = [
+    {
+      accountId: byCode["1200"]!,
+      amount: amount.toString(),
+      description: null,
+      entryId: entry!.id,
+      type: "debit",
+    },
+    {
+      accountId: byCode["5000"]!,
       amount: amount.toString(),
       description: null,
       entryId: entry!.id,
@@ -731,6 +1084,18 @@ const DEFAULT_ACCOUNTS = [
   {
     code: "6300",
     name: "Salaries Expense",
+    type: "expense" as const,
+    normalBalance: "debit" as const,
+  },
+  {
+    code: "6400",
+    name: "Inventory Variance",
+    type: "expense" as const,
+    normalBalance: "debit" as const,
+  },
+  {
+    code: "6500",
+    name: "Freight-In",
     type: "expense" as const,
     normalBalance: "debit" as const,
   },
@@ -1485,7 +1850,7 @@ export const accountingRouter = {
           offset: z.number().int().min(0).default(0),
           periodId: z.string().uuid().optional(),
           sourceType: z
-            .enum(["sale", "expense", "manual", "return"])
+            .enum(["sale", "expense", "manual", "return", "purchase_order"])
             .optional(),
           status: z.enum(["draft", "posted", "void"]).optional(),
           to: z.string().datetime().optional(),
@@ -1600,7 +1965,7 @@ export const accountingRouter = {
       .input(
         z.object({
           id: z.string().uuid(),
-          reason: z.string().min(1).optional(),
+          reason: z.string().min(1),
         })
       )
       .handler(async ({ input }) =>
@@ -1730,7 +2095,7 @@ export const accountingRouter = {
               status: "void",
               updatedAt: now,
               voidedAt: now,
-              voidReason: input.reason ?? null,
+              voidReason: input.reason,
             })
             .where(eq(journalEntries.id, input.id))
             .returning();

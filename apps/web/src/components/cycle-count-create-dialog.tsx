@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -26,61 +27,52 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { queryClient, orpc } from "@/utils/orpc";
 
-interface StockAdjustDialogProps {
+interface CycleCountCreateDialogProps {
   onClose: () => void;
   open: boolean;
 }
 
-export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
-  const [productId, setProductId] = useState("");
+export function CycleCountCreateDialog({
+  open,
+  onClose,
+}: CycleCountCreateDialogProps) {
+  const navigate = useNavigate();
+  const [name, setName] = useState("");
   const [locationId, setLocationId] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
-
-  const productsQuery = useQuery(
-    orpc.inventory.products.list.queryOptions({
-      input: { limit: 100 },
-    })
-  );
 
   const locationsQuery = useQuery(
     orpc.inventory.locations.list.queryOptions({})
   );
 
-  const adjustMutation = useMutation(
-    orpc.inventory.stock.adjust.mutationOptions({
+  const createMutation = useMutation(
+    orpc.inventory.cycleCount.create.mutationOptions({
       onError: (err) => toast.error(err.message),
       onSuccess: (data) => {
-        toast.success(`Stock adjusted. New quantity: ${data.newQuantity}`);
+        toast.success("Cycle count session created");
         queryClient.invalidateQueries({
-          queryKey: orpc.inventory.stock.movements
+          queryKey: orpc.inventory.cycleCount.list
             .queryOptions({ input: {} })
             .queryKey.slice(0, 2),
         });
-        queryClient.invalidateQueries({
-          queryKey: orpc.inventory.products.list
-            .queryOptions({ input: {} })
-            .queryKey.slice(0, 2),
-        });
-        setProductId("");
+        setName("");
         setLocationId("");
-        setQuantity("");
-        setReason("");
         setNotes("");
         onClose();
+        navigate({
+          params: { id: data.id },
+          to: "/inventory/cycle-counts/$id",
+        });
       },
     })
   );
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    adjustMutation.mutate({
+    createMutation.mutate({
       locationId: locationId || undefined,
+      name,
       notes: notes || undefined,
-      productId,
-      quantity: Number(quantity),
-      reason,
     });
   };
 
@@ -95,46 +87,38 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Stock Adjustment</DialogTitle>
+          <DialogTitle>New Cycle Count</DialogTitle>
           <DialogDescription>
-            Adjust stock levels for a product. Use positive numbers to add stock
-            and negative numbers to remove.
+            Create a new physical inventory count session. Stock levels will be
+            snapshot automatically.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="adj-product">
-              Product <span className="text-red-500">*</span>
+            <Label htmlFor="cc-name">
+              Name <span className="text-red-500">*</span>
             </Label>
-            <Select
-              value={productId}
-              onValueChange={(v) => setProductId(v ?? "")}
-            >
-              <SelectTrigger id="adj-product">
-                <SelectValue placeholder="Select a product" />
-              </SelectTrigger>
-              <SelectContent>
-                {(productsQuery.data?.items ?? []).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name} ({p.sku})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              id="cc-name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g., Q1 2026 Full Count"
+            />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="adj-location">Location</Label>
+            <Label htmlFor="cc-location">Location</Label>
             <Select
               value={locationId || "__none__"}
               onValueChange={(v) =>
                 setLocationId(!v || v === "__none__" ? "" : v)
               }
             >
-              <SelectTrigger id="adj-location">
+              <SelectTrigger id="cc-location">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">Default</SelectItem>
+                <SelectItem value="__none__">All locations</SelectItem>
                 {(locationsQuery.data ?? []).map((loc) => (
                   <SelectItem key={loc.id} value={loc.id}>
                     {loc.name}
@@ -144,34 +128,9 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="adj-qty">
-              Quantity <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="adj-qty"
-              type="number"
-              required
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              placeholder="e.g., 10 or -5"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="adj-reason">
-              Reason <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="adj-reason"
-              required
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g., Physical count correction"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="adj-notes">Notes</Label>
+            <Label htmlFor="cc-notes">Notes</Label>
             <Textarea
-              id="adj-notes"
+              id="cc-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional notes..."
@@ -183,13 +142,13 @@ export function StockAdjustDialog({ open, onClose }: StockAdjustDialogProps) {
             </Button>
             <Button
               type="submit"
-              disabled={adjustMutation.isPending}
+              disabled={createMutation.isPending}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {adjustMutation.isPending && (
+              {createMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Adjust Stock
+              Create Session
             </Button>
           </DialogFooter>
         </form>
