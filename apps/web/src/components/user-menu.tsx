@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth-client";
 
+import { OrgSwitcher } from "./org-switcher";
 import { Button } from "./ui/button";
 import { Skeleton } from "./ui/skeleton";
 
@@ -19,7 +20,12 @@ export default function UserMenu() {
   const { data: session, isPending } = authClient.useSession();
 
   if (isPending) {
-    return <Skeleton className="h-9 w-24" />;
+    return (
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-8 w-36" />
+        <Skeleton className="h-9 w-24" />
+      </div>
+    );
   }
 
   if (!session) {
@@ -31,33 +37,38 @@ export default function UserMenu() {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="outline" />}>
-        {session.user.name}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="bg-card">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>My Account</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={() => {
-              authClient.signOut({
-                fetchOptions: {
-                  onSuccess: () => {
-                    navigate({
-                      to: "/",
-                    });
+    <div className="flex items-center gap-2">
+      <OrgSwitcher />
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button variant="outline" />}>
+          {session.user.name}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="bg-card">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/settings/organization">Organization Settings</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => {
+                authClient.signOut({
+                  fetchOptions: {
+                    onSuccess: () => {
+                      navigate({ to: "/" });
+                    },
                   },
-                },
-              });
-            }}
-          >
-            Sign Out
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+                });
+              }}
+            >
+              Sign Out
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }

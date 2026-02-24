@@ -62,6 +62,7 @@ import { Route as PosReportsRouteImport } from "./routes/pos/reports";
 import { Route as PosReturnsRouteImport } from "./routes/pos/returns";
 import { Route as PosSalesRouteImport } from "./routes/pos/sales";
 import { Route as PosShiftsRouteImport } from "./routes/pos/shifts";
+import { Route as SettingsOrganizationRouteImport } from "./routes/settings/organization";
 
 const PosRoute = PosRouteImport.update({
   id: "/pos",
@@ -71,6 +72,11 @@ const PosRoute = PosRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: "/login",
   path: "/login",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsOrganizationRoute = SettingsOrganizationRouteImport.update({
+  id: "/settings/organization",
+  path: "/settings/organization",
   getParentRoute: () => rootRouteImport,
 } as any);
 const InvestmentRoute = InvestmentRouteImport.update({
@@ -664,6 +670,7 @@ export interface RootRouteChildren {
   InvestmentRoute: typeof InvestmentRouteWithChildren;
   LoginRoute: typeof LoginRoute;
   PosRoute: typeof PosRouteWithChildren;
+  SettingsOrganizationRoute: typeof SettingsOrganizationRoute;
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
   ApiRpcSplatRoute: typeof ApiRpcSplatRoute;
 }
@@ -1187,6 +1194,7 @@ const rootRouteChildren: RootRouteChildren = {
   InvestmentRoute: InvestmentRouteWithChildren,
   LoginRoute: LoginRoute,
   PosRoute: PosRouteWithChildren,
+  SettingsOrganizationRoute: SettingsOrganizationRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiRpcSplatRoute: ApiRpcSplatRoute,
 };

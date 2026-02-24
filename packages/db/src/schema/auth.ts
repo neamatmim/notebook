@@ -17,6 +17,7 @@ export const user = pgTable("user", {
 export const session = pgTable(
   "session",
   {
+    activeOrganizationId: text("active_organization_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     expiresAt: timestamp("expires_at").notNull(),
     id: text("id").primaryKey(),
@@ -73,12 +74,67 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)]
 );
 
+export const organization = pgTable("organization", {
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  id: text("id").primaryKey(),
+  logo: text("logo"),
+  metadata: text("metadata"),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+});
+
+export const member = pgTable(
+  "member",
+  {
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    index("member_organizationId_idx").on(table.organizationId),
+    index("member_userId_idx").on(table.userId),
+  ]
+);
+
+export const invitation = pgTable(
+  "invitation",
+  {
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    email: text("email").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    id: text("id").primaryKey(),
+    inviterId: text("inviter_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    role: text("role"),
+    status: text("status").notNull().default("pending"),
+  },
+  (table) => [
+    index("invitation_organizationId_idx").on(table.organizationId),
+    index("invitation_email_idx").on(table.email),
+  ]
+);
+
 export const userRelations = relations(user, ({ many }) => ({
   accounts: many(account),
+  members: many(member),
   sessions: many(session),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
+  activeOrganization: one(organization, {
+    fields: [session.activeOrganizationId],
+    references: [organization.id],
+  }),
   user: one(user, {
     fields: [session.userId],
     references: [user.id],
@@ -89,5 +145,32 @@ export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, {
     fields: [account.userId],
     references: [user.id],
+  }),
+}));
+
+export const organizationRelations = relations(organization, ({ many }) => ({
+  invitations: many(invitation),
+  members: many(member),
+}));
+
+export const memberRelations = relations(member, ({ one }) => ({
+  organization: one(organization, {
+    fields: [member.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, {
+    fields: [member.userId],
+    references: [user.id],
+  }),
+}));
+
+export const invitationRelations = relations(invitation, ({ one }) => ({
+  inviter: one(user, {
+    fields: [invitation.inviterId],
+    references: [user.id],
+  }),
+  organization: one(organization, {
+    fields: [invitation.organizationId],
+    references: [organization.id],
   }),
 }));
