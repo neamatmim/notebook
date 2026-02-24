@@ -21,17 +21,24 @@ import { Route as ApiRpcSplatRouteImport } from "./routes/api/rpc/$";
 import { Route as DashboardRouteImport } from "./routes/dashboard";
 import { Route as IndexRouteImport } from "./routes/index";
 import { Route as InventoryRouteImport } from "./routes/inventory";
+import { Route as InventoryBatchesRouteImport } from "./routes/inventory/batches";
 import { Route as InventoryCategoriesRouteImport } from "./routes/inventory/categories";
+import { Route as InventoryCycleCountsRouteImport } from "./routes/inventory/cycle-counts";
+import { Route as InventoryCycleCountsIdRouteImport } from "./routes/inventory/cycle-counts.$id";
+import { Route as InventoryCycleCountsIndexRouteImport } from "./routes/inventory/cycle-counts/index";
 import { Route as InventoryIndexRouteImport } from "./routes/inventory/index";
 import { Route as InventoryLocationsRouteImport } from "./routes/inventory/locations";
 import { Route as InventoryProductsRouteImport } from "./routes/inventory/products";
 import { Route as InventoryPurchaseOrdersRouteImport } from "./routes/inventory/purchase-orders";
 import { Route as InventorySettingsRouteImport } from "./routes/inventory/settings";
+import { Route as InventoryStockLevelsRouteImport } from "./routes/inventory/stock-levels";
 import { Route as InventoryStockMovementsRouteImport } from "./routes/inventory/stock-movements";
 import { Route as InventorySuppliersRouteImport } from "./routes/inventory/suppliers";
 import { Route as InvestmentRouteImport } from "./routes/investment";
 import { Route as InvestmentCapitalCallsRouteImport } from "./routes/investment/capital-calls";
 import { Route as InvestmentDistributionsRouteImport } from "./routes/investment/distributions";
+import { Route as InvestmentFeeInvoicesRouteImport } from "./routes/investment/fee-invoices";
+import { Route as InvestmentFeeSchedulesRouteImport } from "./routes/investment/fee-schedules";
 import { Route as InvestmentIndexRouteImport } from "./routes/investment/index";
 import { Route as InvestmentInvestorsRouteImport } from "./routes/investment/investors";
 import { Route as InvestmentMilestonesRouteImport } from "./routes/investment/milestones";
@@ -44,11 +51,13 @@ import { Route as LoginRouteImport } from "./routes/login";
 import { Route as PosRouteImport } from "./routes/pos";
 import { Route as PosCustomersRouteImport } from "./routes/pos/customers";
 import { Route as PosDiscountsRouteImport } from "./routes/pos/discounts";
+import { Route as PosEmployeesRouteImport } from "./routes/pos/employees";
 import { Route as PosGiftCardsRouteImport } from "./routes/pos/gift-cards";
 import { Route as PosIndexRouteImport } from "./routes/pos/index";
 import { Route as PosReportsRouteImport } from "./routes/pos/reports";
 import { Route as PosReturnsRouteImport } from "./routes/pos/returns";
 import { Route as PosSalesRouteImport } from "./routes/pos/sales";
+import { Route as PosShiftsRouteImport } from "./routes/pos/shifts";
 
 const PosRoute = PosRouteImport.update({
   id: "/pos",
@@ -105,6 +114,11 @@ const AccountingIndexRoute = AccountingIndexRouteImport.update({
   path: "/",
   getParentRoute: () => AccountingRoute,
 } as any);
+const PosShiftsRoute = PosShiftsRouteImport.update({
+  id: "/shifts",
+  path: "/shifts",
+  getParentRoute: () => PosRoute,
+} as any);
 const PosSalesRoute = PosSalesRouteImport.update({
   id: "/sales",
   path: "/sales",
@@ -123,6 +137,11 @@ const PosReportsRoute = PosReportsRouteImport.update({
 const PosGiftCardsRoute = PosGiftCardsRouteImport.update({
   id: "/gift-cards",
   path: "/gift-cards",
+  getParentRoute: () => PosRoute,
+} as any);
+const PosEmployeesRoute = PosEmployeesRouteImport.update({
+  id: "/employees",
+  path: "/employees",
   getParentRoute: () => PosRoute,
 } as any);
 const PosDiscountsRoute = PosDiscountsRouteImport.update({
@@ -170,6 +189,16 @@ const InvestmentInvestorsRoute = InvestmentInvestorsRouteImport.update({
   path: "/investors",
   getParentRoute: () => InvestmentRoute,
 } as any);
+const InvestmentFeeSchedulesRoute = InvestmentFeeSchedulesRouteImport.update({
+  id: "/fee-schedules",
+  path: "/fee-schedules",
+  getParentRoute: () => InvestmentRoute,
+} as any);
+const InvestmentFeeInvoicesRoute = InvestmentFeeInvoicesRouteImport.update({
+  id: "/fee-invoices",
+  path: "/fee-invoices",
+  getParentRoute: () => InvestmentRoute,
+} as any);
 const InvestmentDistributionsRoute = InvestmentDistributionsRouteImport.update({
   id: "/distributions",
   path: "/distributions",
@@ -188,6 +217,11 @@ const InventorySuppliersRoute = InventorySuppliersRouteImport.update({
 const InventoryStockMovementsRoute = InventoryStockMovementsRouteImport.update({
   id: "/stock-movements",
   path: "/stock-movements",
+  getParentRoute: () => InventoryRoute,
+} as any);
+const InventoryStockLevelsRoute = InventoryStockLevelsRouteImport.update({
+  id: "/stock-levels",
+  path: "/stock-levels",
   getParentRoute: () => InventoryRoute,
 } as any);
 const InventorySettingsRoute = InventorySettingsRouteImport.update({
@@ -210,9 +244,19 @@ const InventoryLocationsRoute = InventoryLocationsRouteImport.update({
   path: "/locations",
   getParentRoute: () => InventoryRoute,
 } as any);
+const InventoryCycleCountsRoute = InventoryCycleCountsRouteImport.update({
+  id: "/cycle-counts",
+  path: "/cycle-counts",
+  getParentRoute: () => InventoryRoute,
+} as any);
 const InventoryCategoriesRoute = InventoryCategoriesRouteImport.update({
   id: "/categories",
   path: "/categories",
+  getParentRoute: () => InventoryRoute,
+} as any);
+const InventoryBatchesRoute = InventoryBatchesRouteImport.update({
+  id: "/batches",
+  path: "/batches",
   getParentRoute: () => InventoryRoute,
 } as any);
 const AccountingSettingsRoute = AccountingSettingsRouteImport.update({
@@ -242,6 +286,17 @@ const AccountingChartOfAccountsRoute =
     path: "/chart-of-accounts",
     getParentRoute: () => AccountingRoute,
   } as any);
+const InventoryCycleCountsIndexRoute =
+  InventoryCycleCountsIndexRouteImport.update({
+    id: "/",
+    path: "/",
+    getParentRoute: () => InventoryCycleCountsRoute,
+  } as any);
+const InventoryCycleCountsIdRoute = InventoryCycleCountsIdRouteImport.update({
+  id: "/$id",
+  path: "/$id",
+  getParentRoute: () => InventoryCycleCountsRoute,
+} as any);
 const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
   id: "/api/rpc/$",
   path: "/api/rpc/$",
@@ -266,15 +321,20 @@ export interface FileRoutesByFullPath {
   "/accounting/journal-entries": typeof AccountingJournalEntriesRoute;
   "/accounting/reports": typeof AccountingReportsRoute;
   "/accounting/settings": typeof AccountingSettingsRoute;
+  "/inventory/batches": typeof InventoryBatchesRoute;
   "/inventory/categories": typeof InventoryCategoriesRoute;
+  "/inventory/cycle-counts": typeof InventoryCycleCountsRouteWithChildren;
   "/inventory/locations": typeof InventoryLocationsRoute;
   "/inventory/products": typeof InventoryProductsRoute;
   "/inventory/purchase-orders": typeof InventoryPurchaseOrdersRoute;
   "/inventory/settings": typeof InventorySettingsRoute;
+  "/inventory/stock-levels": typeof InventoryStockLevelsRoute;
   "/inventory/stock-movements": typeof InventoryStockMovementsRoute;
   "/inventory/suppliers": typeof InventorySuppliersRoute;
   "/investment/capital-calls": typeof InvestmentCapitalCallsRoute;
   "/investment/distributions": typeof InvestmentDistributionsRoute;
+  "/investment/fee-invoices": typeof InvestmentFeeInvoicesRoute;
+  "/investment/fee-schedules": typeof InvestmentFeeSchedulesRoute;
   "/investment/investors": typeof InvestmentInvestorsRoute;
   "/investment/milestones": typeof InvestmentMilestonesRoute;
   "/investment/payments": typeof InvestmentPaymentsRoute;
@@ -284,16 +344,20 @@ export interface FileRoutesByFullPath {
   "/investment/shareholders": typeof InvestmentShareholdersRoute;
   "/pos/customers": typeof PosCustomersRoute;
   "/pos/discounts": typeof PosDiscountsRoute;
+  "/pos/employees": typeof PosEmployeesRoute;
   "/pos/gift-cards": typeof PosGiftCardsRoute;
   "/pos/reports": typeof PosReportsRoute;
   "/pos/returns": typeof PosReturnsRoute;
   "/pos/sales": typeof PosSalesRoute;
+  "/pos/shifts": typeof PosShiftsRoute;
   "/accounting/": typeof AccountingIndexRoute;
   "/inventory/": typeof InventoryIndexRoute;
   "/investment/": typeof InvestmentIndexRoute;
   "/pos/": typeof PosIndexRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/rpc/$": typeof ApiRpcSplatRoute;
+  "/inventory/cycle-counts/$id": typeof InventoryCycleCountsIdRoute;
+  "/inventory/cycle-counts/": typeof InventoryCycleCountsIndexRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
@@ -304,15 +368,19 @@ export interface FileRoutesByTo {
   "/accounting/journal-entries": typeof AccountingJournalEntriesRoute;
   "/accounting/reports": typeof AccountingReportsRoute;
   "/accounting/settings": typeof AccountingSettingsRoute;
+  "/inventory/batches": typeof InventoryBatchesRoute;
   "/inventory/categories": typeof InventoryCategoriesRoute;
   "/inventory/locations": typeof InventoryLocationsRoute;
   "/inventory/products": typeof InventoryProductsRoute;
   "/inventory/purchase-orders": typeof InventoryPurchaseOrdersRoute;
   "/inventory/settings": typeof InventorySettingsRoute;
+  "/inventory/stock-levels": typeof InventoryStockLevelsRoute;
   "/inventory/stock-movements": typeof InventoryStockMovementsRoute;
   "/inventory/suppliers": typeof InventorySuppliersRoute;
   "/investment/capital-calls": typeof InvestmentCapitalCallsRoute;
   "/investment/distributions": typeof InvestmentDistributionsRoute;
+  "/investment/fee-invoices": typeof InvestmentFeeInvoicesRoute;
+  "/investment/fee-schedules": typeof InvestmentFeeSchedulesRoute;
   "/investment/investors": typeof InvestmentInvestorsRoute;
   "/investment/milestones": typeof InvestmentMilestonesRoute;
   "/investment/payments": typeof InvestmentPaymentsRoute;
@@ -322,16 +390,20 @@ export interface FileRoutesByTo {
   "/investment/shareholders": typeof InvestmentShareholdersRoute;
   "/pos/customers": typeof PosCustomersRoute;
   "/pos/discounts": typeof PosDiscountsRoute;
+  "/pos/employees": typeof PosEmployeesRoute;
   "/pos/gift-cards": typeof PosGiftCardsRoute;
   "/pos/reports": typeof PosReportsRoute;
   "/pos/returns": typeof PosReturnsRoute;
   "/pos/sales": typeof PosSalesRoute;
+  "/pos/shifts": typeof PosShiftsRoute;
   "/accounting": typeof AccountingIndexRoute;
   "/inventory": typeof InventoryIndexRoute;
   "/investment": typeof InvestmentIndexRoute;
   "/pos": typeof PosIndexRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/rpc/$": typeof ApiRpcSplatRoute;
+  "/inventory/cycle-counts/$id": typeof InventoryCycleCountsIdRoute;
+  "/inventory/cycle-counts": typeof InventoryCycleCountsIndexRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
@@ -347,15 +419,20 @@ export interface FileRoutesById {
   "/accounting/journal-entries": typeof AccountingJournalEntriesRoute;
   "/accounting/reports": typeof AccountingReportsRoute;
   "/accounting/settings": typeof AccountingSettingsRoute;
+  "/inventory/batches": typeof InventoryBatchesRoute;
   "/inventory/categories": typeof InventoryCategoriesRoute;
+  "/inventory/cycle-counts": typeof InventoryCycleCountsRouteWithChildren;
   "/inventory/locations": typeof InventoryLocationsRoute;
   "/inventory/products": typeof InventoryProductsRoute;
   "/inventory/purchase-orders": typeof InventoryPurchaseOrdersRoute;
   "/inventory/settings": typeof InventorySettingsRoute;
+  "/inventory/stock-levels": typeof InventoryStockLevelsRoute;
   "/inventory/stock-movements": typeof InventoryStockMovementsRoute;
   "/inventory/suppliers": typeof InventorySuppliersRoute;
   "/investment/capital-calls": typeof InvestmentCapitalCallsRoute;
   "/investment/distributions": typeof InvestmentDistributionsRoute;
+  "/investment/fee-invoices": typeof InvestmentFeeInvoicesRoute;
+  "/investment/fee-schedules": typeof InvestmentFeeSchedulesRoute;
   "/investment/investors": typeof InvestmentInvestorsRoute;
   "/investment/milestones": typeof InvestmentMilestonesRoute;
   "/investment/payments": typeof InvestmentPaymentsRoute;
@@ -365,16 +442,20 @@ export interface FileRoutesById {
   "/investment/shareholders": typeof InvestmentShareholdersRoute;
   "/pos/customers": typeof PosCustomersRoute;
   "/pos/discounts": typeof PosDiscountsRoute;
+  "/pos/employees": typeof PosEmployeesRoute;
   "/pos/gift-cards": typeof PosGiftCardsRoute;
   "/pos/reports": typeof PosReportsRoute;
   "/pos/returns": typeof PosReturnsRoute;
   "/pos/sales": typeof PosSalesRoute;
+  "/pos/shifts": typeof PosShiftsRoute;
   "/accounting/": typeof AccountingIndexRoute;
   "/inventory/": typeof InventoryIndexRoute;
   "/investment/": typeof InvestmentIndexRoute;
   "/pos/": typeof PosIndexRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/rpc/$": typeof ApiRpcSplatRoute;
+  "/inventory/cycle-counts/$id": typeof InventoryCycleCountsIdRoute;
+  "/inventory/cycle-counts/": typeof InventoryCycleCountsIndexRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
@@ -391,15 +472,20 @@ export interface FileRouteTypes {
     | "/accounting/journal-entries"
     | "/accounting/reports"
     | "/accounting/settings"
+    | "/inventory/batches"
     | "/inventory/categories"
+    | "/inventory/cycle-counts"
     | "/inventory/locations"
     | "/inventory/products"
     | "/inventory/purchase-orders"
     | "/inventory/settings"
+    | "/inventory/stock-levels"
     | "/inventory/stock-movements"
     | "/inventory/suppliers"
     | "/investment/capital-calls"
     | "/investment/distributions"
+    | "/investment/fee-invoices"
+    | "/investment/fee-schedules"
     | "/investment/investors"
     | "/investment/milestones"
     | "/investment/payments"
@@ -409,16 +495,20 @@ export interface FileRouteTypes {
     | "/investment/shareholders"
     | "/pos/customers"
     | "/pos/discounts"
+    | "/pos/employees"
     | "/pos/gift-cards"
     | "/pos/reports"
     | "/pos/returns"
     | "/pos/sales"
+    | "/pos/shifts"
     | "/accounting/"
     | "/inventory/"
     | "/investment/"
     | "/pos/"
     | "/api/auth/$"
-    | "/api/rpc/$";
+    | "/api/rpc/$"
+    | "/inventory/cycle-counts/$id"
+    | "/inventory/cycle-counts/";
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
@@ -429,15 +519,19 @@ export interface FileRouteTypes {
     | "/accounting/journal-entries"
     | "/accounting/reports"
     | "/accounting/settings"
+    | "/inventory/batches"
     | "/inventory/categories"
     | "/inventory/locations"
     | "/inventory/products"
     | "/inventory/purchase-orders"
     | "/inventory/settings"
+    | "/inventory/stock-levels"
     | "/inventory/stock-movements"
     | "/inventory/suppliers"
     | "/investment/capital-calls"
     | "/investment/distributions"
+    | "/investment/fee-invoices"
+    | "/investment/fee-schedules"
     | "/investment/investors"
     | "/investment/milestones"
     | "/investment/payments"
@@ -447,16 +541,20 @@ export interface FileRouteTypes {
     | "/investment/shareholders"
     | "/pos/customers"
     | "/pos/discounts"
+    | "/pos/employees"
     | "/pos/gift-cards"
     | "/pos/reports"
     | "/pos/returns"
     | "/pos/sales"
+    | "/pos/shifts"
     | "/accounting"
     | "/inventory"
     | "/investment"
     | "/pos"
     | "/api/auth/$"
-    | "/api/rpc/$";
+    | "/api/rpc/$"
+    | "/inventory/cycle-counts/$id"
+    | "/inventory/cycle-counts";
   id:
     | "__root__"
     | "/"
@@ -471,15 +569,20 @@ export interface FileRouteTypes {
     | "/accounting/journal-entries"
     | "/accounting/reports"
     | "/accounting/settings"
+    | "/inventory/batches"
     | "/inventory/categories"
+    | "/inventory/cycle-counts"
     | "/inventory/locations"
     | "/inventory/products"
     | "/inventory/purchase-orders"
     | "/inventory/settings"
+    | "/inventory/stock-levels"
     | "/inventory/stock-movements"
     | "/inventory/suppliers"
     | "/investment/capital-calls"
     | "/investment/distributions"
+    | "/investment/fee-invoices"
+    | "/investment/fee-schedules"
     | "/investment/investors"
     | "/investment/milestones"
     | "/investment/payments"
@@ -489,16 +592,20 @@ export interface FileRouteTypes {
     | "/investment/shareholders"
     | "/pos/customers"
     | "/pos/discounts"
+    | "/pos/employees"
     | "/pos/gift-cards"
     | "/pos/reports"
     | "/pos/returns"
     | "/pos/sales"
+    | "/pos/shifts"
     | "/accounting/"
     | "/inventory/"
     | "/investment/"
     | "/pos/"
     | "/api/auth/$"
-    | "/api/rpc/$";
+    | "/api/rpc/$"
+    | "/inventory/cycle-counts/$id"
+    | "/inventory/cycle-counts/";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
@@ -592,6 +699,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AccountingIndexRouteImport;
       parentRoute: typeof AccountingRoute;
     };
+    "/pos/shifts": {
+      id: "/pos/shifts";
+      path: "/shifts";
+      fullPath: "/pos/shifts";
+      preLoaderRoute: typeof PosShiftsRouteImport;
+      parentRoute: typeof PosRoute;
+    };
     "/pos/sales": {
       id: "/pos/sales";
       path: "/sales";
@@ -618,6 +732,13 @@ declare module "@tanstack/react-router" {
       path: "/gift-cards";
       fullPath: "/pos/gift-cards";
       preLoaderRoute: typeof PosGiftCardsRouteImport;
+      parentRoute: typeof PosRoute;
+    };
+    "/pos/employees": {
+      id: "/pos/employees";
+      path: "/employees";
+      fullPath: "/pos/employees";
+      preLoaderRoute: typeof PosEmployeesRouteImport;
       parentRoute: typeof PosRoute;
     };
     "/pos/discounts": {
@@ -683,6 +804,20 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof InvestmentInvestorsRouteImport;
       parentRoute: typeof InvestmentRoute;
     };
+    "/investment/fee-schedules": {
+      id: "/investment/fee-schedules";
+      path: "/fee-schedules";
+      fullPath: "/investment/fee-schedules";
+      preLoaderRoute: typeof InvestmentFeeSchedulesRouteImport;
+      parentRoute: typeof InvestmentRoute;
+    };
+    "/investment/fee-invoices": {
+      id: "/investment/fee-invoices";
+      path: "/fee-invoices";
+      fullPath: "/investment/fee-invoices";
+      preLoaderRoute: typeof InvestmentFeeInvoicesRouteImport;
+      parentRoute: typeof InvestmentRoute;
+    };
     "/investment/distributions": {
       id: "/investment/distributions";
       path: "/distributions";
@@ -709,6 +844,13 @@ declare module "@tanstack/react-router" {
       path: "/stock-movements";
       fullPath: "/inventory/stock-movements";
       preLoaderRoute: typeof InventoryStockMovementsRouteImport;
+      parentRoute: typeof InventoryRoute;
+    };
+    "/inventory/stock-levels": {
+      id: "/inventory/stock-levels";
+      path: "/stock-levels";
+      fullPath: "/inventory/stock-levels";
+      preLoaderRoute: typeof InventoryStockLevelsRouteImport;
       parentRoute: typeof InventoryRoute;
     };
     "/inventory/settings": {
@@ -739,11 +881,25 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof InventoryLocationsRouteImport;
       parentRoute: typeof InventoryRoute;
     };
+    "/inventory/cycle-counts": {
+      id: "/inventory/cycle-counts";
+      path: "/cycle-counts";
+      fullPath: "/inventory/cycle-counts";
+      preLoaderRoute: typeof InventoryCycleCountsRouteImport;
+      parentRoute: typeof InventoryRoute;
+    };
     "/inventory/categories": {
       id: "/inventory/categories";
       path: "/categories";
       fullPath: "/inventory/categories";
       preLoaderRoute: typeof InventoryCategoriesRouteImport;
+      parentRoute: typeof InventoryRoute;
+    };
+    "/inventory/batches": {
+      id: "/inventory/batches";
+      path: "/batches";
+      fullPath: "/inventory/batches";
+      preLoaderRoute: typeof InventoryBatchesRouteImport;
       parentRoute: typeof InventoryRoute;
     };
     "/accounting/settings": {
@@ -780,6 +936,20 @@ declare module "@tanstack/react-router" {
       fullPath: "/accounting/chart-of-accounts";
       preLoaderRoute: typeof AccountingChartOfAccountsRouteImport;
       parentRoute: typeof AccountingRoute;
+    };
+    "/inventory/cycle-counts/": {
+      id: "/inventory/cycle-counts/";
+      path: "/";
+      fullPath: "/inventory/cycle-counts/";
+      preLoaderRoute: typeof InventoryCycleCountsIndexRouteImport;
+      parentRoute: typeof InventoryCycleCountsRoute;
+    };
+    "/inventory/cycle-counts/$id": {
+      id: "/inventory/cycle-counts/$id";
+      path: "/$id";
+      fullPath: "/inventory/cycle-counts/$id";
+      preLoaderRoute: typeof InventoryCycleCountsIdRouteImport;
+      parentRoute: typeof InventoryCycleCountsRoute;
     };
     "/api/rpc/$": {
       id: "/api/rpc/$";
@@ -820,23 +990,42 @@ const AccountingRouteWithChildren = AccountingRoute._addFileChildren(
   AccountingRouteChildren
 );
 
+interface InventoryCycleCountsRouteChildren {
+  InventoryCycleCountsIdRoute: typeof InventoryCycleCountsIdRoute;
+  InventoryCycleCountsIndexRoute: typeof InventoryCycleCountsIndexRoute;
+}
+
+const InventoryCycleCountsRouteChildren: InventoryCycleCountsRouteChildren = {
+  InventoryCycleCountsIdRoute: InventoryCycleCountsIdRoute,
+  InventoryCycleCountsIndexRoute: InventoryCycleCountsIndexRoute,
+};
+
+const InventoryCycleCountsRouteWithChildren =
+  InventoryCycleCountsRoute._addFileChildren(InventoryCycleCountsRouteChildren);
+
 interface InventoryRouteChildren {
+  InventoryBatchesRoute: typeof InventoryBatchesRoute;
   InventoryCategoriesRoute: typeof InventoryCategoriesRoute;
+  InventoryCycleCountsRoute: typeof InventoryCycleCountsRouteWithChildren;
   InventoryLocationsRoute: typeof InventoryLocationsRoute;
   InventoryProductsRoute: typeof InventoryProductsRoute;
   InventoryPurchaseOrdersRoute: typeof InventoryPurchaseOrdersRoute;
   InventorySettingsRoute: typeof InventorySettingsRoute;
+  InventoryStockLevelsRoute: typeof InventoryStockLevelsRoute;
   InventoryStockMovementsRoute: typeof InventoryStockMovementsRoute;
   InventorySuppliersRoute: typeof InventorySuppliersRoute;
   InventoryIndexRoute: typeof InventoryIndexRoute;
 }
 
 const InventoryRouteChildren: InventoryRouteChildren = {
+  InventoryBatchesRoute: InventoryBatchesRoute,
   InventoryCategoriesRoute: InventoryCategoriesRoute,
+  InventoryCycleCountsRoute: InventoryCycleCountsRouteWithChildren,
   InventoryLocationsRoute: InventoryLocationsRoute,
   InventoryProductsRoute: InventoryProductsRoute,
   InventoryPurchaseOrdersRoute: InventoryPurchaseOrdersRoute,
   InventorySettingsRoute: InventorySettingsRoute,
+  InventoryStockLevelsRoute: InventoryStockLevelsRoute,
   InventoryStockMovementsRoute: InventoryStockMovementsRoute,
   InventorySuppliersRoute: InventorySuppliersRoute,
   InventoryIndexRoute: InventoryIndexRoute,
@@ -849,6 +1038,8 @@ const InventoryRouteWithChildren = InventoryRoute._addFileChildren(
 interface InvestmentRouteChildren {
   InvestmentCapitalCallsRoute: typeof InvestmentCapitalCallsRoute;
   InvestmentDistributionsRoute: typeof InvestmentDistributionsRoute;
+  InvestmentFeeInvoicesRoute: typeof InvestmentFeeInvoicesRoute;
+  InvestmentFeeSchedulesRoute: typeof InvestmentFeeSchedulesRoute;
   InvestmentInvestorsRoute: typeof InvestmentInvestorsRoute;
   InvestmentMilestonesRoute: typeof InvestmentMilestonesRoute;
   InvestmentPaymentsRoute: typeof InvestmentPaymentsRoute;
@@ -862,6 +1053,8 @@ interface InvestmentRouteChildren {
 const InvestmentRouteChildren: InvestmentRouteChildren = {
   InvestmentCapitalCallsRoute: InvestmentCapitalCallsRoute,
   InvestmentDistributionsRoute: InvestmentDistributionsRoute,
+  InvestmentFeeInvoicesRoute: InvestmentFeeInvoicesRoute,
+  InvestmentFeeSchedulesRoute: InvestmentFeeSchedulesRoute,
   InvestmentInvestorsRoute: InvestmentInvestorsRoute,
   InvestmentMilestonesRoute: InvestmentMilestonesRoute,
   InvestmentPaymentsRoute: InvestmentPaymentsRoute,
@@ -879,20 +1072,24 @@ const InvestmentRouteWithChildren = InvestmentRoute._addFileChildren(
 interface PosRouteChildren {
   PosCustomersRoute: typeof PosCustomersRoute;
   PosDiscountsRoute: typeof PosDiscountsRoute;
+  PosEmployeesRoute: typeof PosEmployeesRoute;
   PosGiftCardsRoute: typeof PosGiftCardsRoute;
   PosReportsRoute: typeof PosReportsRoute;
   PosReturnsRoute: typeof PosReturnsRoute;
   PosSalesRoute: typeof PosSalesRoute;
+  PosShiftsRoute: typeof PosShiftsRoute;
   PosIndexRoute: typeof PosIndexRoute;
 }
 
 const PosRouteChildren: PosRouteChildren = {
   PosCustomersRoute: PosCustomersRoute,
   PosDiscountsRoute: PosDiscountsRoute,
+  PosEmployeesRoute: PosEmployeesRoute,
   PosGiftCardsRoute: PosGiftCardsRoute,
   PosReportsRoute: PosReportsRoute,
   PosReturnsRoute: PosReturnsRoute,
   PosSalesRoute: PosSalesRoute,
+  PosShiftsRoute: PosShiftsRoute,
   PosIndexRoute: PosIndexRoute,
 };
 

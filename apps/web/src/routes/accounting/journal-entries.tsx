@@ -27,7 +27,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { orpc } from "@/utils/orpc";
 
 type JEStatus = "draft" | "posted" | "void";
-type SourceType = "expense" | "manual" | "return" | "sale";
+type SourceType =
+  | "expense"
+  | "manual"
+  | "membership_fee"
+  | "purchase_order"
+  | "return"
+  | "sale";
 
 const STATUS_COLORS: Record<JEStatus, string> = {
   draft: "bg-yellow-100 text-yellow-700",
@@ -38,6 +44,8 @@ const STATUS_COLORS: Record<JEStatus, string> = {
 const SOURCE_COLORS: Record<SourceType, string> = {
   expense: "bg-orange-100 text-orange-700",
   manual: "bg-blue-100 text-blue-700",
+  membership_fee: "bg-emerald-100 text-emerald-700",
+  purchase_order: "bg-indigo-100 text-indigo-700",
   return: "bg-red-100 text-red-700",
   sale: "bg-purple-100 text-purple-700",
 };
@@ -184,9 +192,13 @@ function JournalEntriesPage() {
     if (!voidId) {
       return;
     }
+    if (!voidReason.trim()) {
+      toast.error("A reason is required to void a journal entry");
+      return;
+    }
     voidMutation.mutate({
       id: voidId,
-      reason: voidReason.trim() || undefined,
+      reason: voidReason.trim(),
     });
   };
 
@@ -436,7 +448,9 @@ function JournalEntriesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-1">
-            <Label htmlFor="void-reason">Reason (optional)</Label>
+            <Label htmlFor="void-reason">
+              Reason <span className="text-red-500">*</span>
+            </Label>
             <Textarea
               id="void-reason"
               placeholder="e.g. Entered in wrong period, duplicate entry…"
@@ -457,7 +471,7 @@ function JournalEntriesPage() {
             </Button>
             <Button
               variant="destructive"
-              disabled={voidMutation.isPending}
+              disabled={voidMutation.isPending || !voidReason.trim()}
               onClick={confirmVoid}
             >
               {voidMutation.isPending && (

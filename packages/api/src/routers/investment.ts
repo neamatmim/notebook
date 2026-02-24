@@ -8,6 +8,9 @@ import {
   investors,
   journalEntries,
   journalEntryLines,
+  membershipFeeInvoices,
+  membershipFeeSchedules,
+  memberStatuses,
   projectMilestones,
   shareClasses,
   shareholderAllocations,
@@ -15,7 +18,7 @@ import {
   shareTransfers,
 } from "@notebook/db/schema";
 import { ORPCError } from "@orpc/server";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure } from "../index";
@@ -2270,12 +2273,571 @@ const paymentsRouter = {
     ),
 };
 
+const membershipFeeSchedulesRouter = {
+  create: protectedProcedure
+    .input(
+      z.object({
+        amount: z.string(),
+        billingCycle: z.enum(["monthly", "quarterly", "biannual", "annual"]),
+        cashAccountId: z.string().uuid().optional(),
+        description: z.string().optional(),
+        feeType: z.enum(["flat_per_member", "per_share"]),
+        name: z.string().min(1),
+        notes: z.string().optional(),
+        revenueAccountId: z.string().uuid().optional(),
+        shareClassId: z.string().uuid(),
+      })
+    )
+    .handler(async ({ input }) => {
+      const [schedule] = await db
+        .insert(membershipFeeSchedules)
+        .values(input)
+        .returning();
+      return schedule;
+    }),
+
+  list: protectedProcedure
+    .input(
+      z.object({
+        isActive: z.boolean().optional(),
+        shareClassId: z.string().uuid().optional(),
+      })
+    )
+    .handler(async ({ input }) => {
+      const conditions = [];
+      if (input.shareClassId) {
+        conditions.push(
+          eq(membershipFeeSchedules.shareClassId, input.shareClassId)
+        );
+      }
+      if (input.isActive !== undefined) {
+        conditions.push(eq(membershipFeeSchedules.isActive, input.isActive));
+      }
+
+      const items = await db
+        .select({
+          amount: membershipFeeSchedules.amount,
+          billingCycle: membershipFeeSchedules.billingCycle,
+          cashAccountId: membershipFeeSchedules.cashAccountId,
+          createdAt: membershipFeeSchedules.createdAt,
+          description: membershipFeeSchedules.description,
+          feeType: membershipFeeSchedules.feeType,
+          id: membershipFeeSchedules.id,
+          isActive: membershipFeeSchedules.isActive,
+          name: membershipFeeSchedules.name,
+          notes: membershipFeeSchedules.notes,
+          revenueAccountId: membershipFeeSchedules.revenueAccountId,
+          shareClassCode: shareClasses.code,
+          shareClassId: membershipFeeSchedules.shareClassId,
+          shareClassName: shareClasses.name,
+          updatedAt: membershipFeeSchedules.updatedAt,
+        })
+        .from(membershipFeeSchedules)
+        .leftJoin(
+          shareClasses,
+          eq(membershipFeeSchedules.shareClassId, shareClasses.id)
+        )
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(membershipFeeSchedules.createdAt));
+
+      return { items };
+    }),
+
+  toggle: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .handler(async ({ input }) => {
+      const [schedule] = await db
+        .select({
+          id: membershipFeeSchedules.id,
+          isActive: membershipFeeSchedules.isActive,
+        })
+        .from(membershipFeeSchedules)
+        .where(eq(membershipFeeSchedules.id, input.id))
+        .limit(1);
+
+      if (!schedule) {
+        throw new ORPCError("NOT_FOUND", { message: "Fee schedule not found" });
+      }
+
+      const [updated] = await db
+        .update(membershipFeeSchedules)
+        .set({ isActive: !schedule.isActive, updatedAt: new Date() })
+        .where(eq(membershipFeeSchedules.id, input.id))
+        .returning();
+
+      return updated;
+    }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        amount: z.string().optional(),
+        billingCycle: z
+          .enum(["monthly", "quarterly", "biannual", "annual"])
+          .optional(),
+        cashAccountId: z.string().uuid().optional(),
+        description: z.string().optional(),
+        feeType: z.enum(["flat_per_member", "per_share"]).optional(),
+        id: z.string().uuid(),
+        name: z.string().min(1).optional(),
+        notes: z.string().optional(),
+        revenueAccountId: z.string().uuid().optional(),
+      })
+    )
+    .handler(async ({ input }) => {
+      const { id, ...fields } = input;
+      const [updated] = await db
+        .update(membershipFeeSchedules)
+        .set({ ...fields, updatedAt: new Date() })
+        .where(eq(membershipFeeSchedules.id, id))
+        .returning();
+
+      if (!updated) {
+        throw new ORPCError("NOT_FOUND", { message: "Fee schedule not found" });
+      }
+      return updated;
+    }),
+};
+
+const membershipFeeInvoicesRouter = {
+  generate: protectedProcedure
+    .input(
+      z.object({
+        dueDate: z.string(),
+        periodEnd: z.string(),
+        periodLabel: z.string().min(1),
+        periodStart: z.string(),
+        scheduleId: z.string().uuid(),
+      })
+    )
+    .handler(async ({ input }) =>
+      db.transaction(async (tx) => {
+        const [schedule] = await tx
+          .select()
+          .from(membershipFeeSchedules)
+          .where(eq(membershipFeeSchedules.id, input.scheduleId))
+          .limit(1);
+
+        if (!schedule) {
+          throw new ORPCError("NOT_FOUND", {
+            message: "Fee schedule not found",
+          });
+        }
+        if (!schedule.isActive) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Fee schedule is inactive",
+          });
+        }
+
+        const allocations = await tx
+          .select()
+          .from(shareholderAllocations)
+          .where(
+            and(
+              eq(shareholderAllocations.shareClassId, schedule.shareClassId),
+              eq(shareholderAllocations.status, "active")
+            )
+          );
+
+        let generated = 0;
+        let skipped = 0;
+
+        for (const alloc of allocations) {
+          const existing = await tx
+            .select({ id: membershipFeeInvoices.id })
+            .from(membershipFeeInvoices)
+            .where(
+              and(
+                eq(membershipFeeInvoices.scheduleId, input.scheduleId),
+                eq(membershipFeeInvoices.investorId, alloc.investorId),
+                eq(membershipFeeInvoices.periodLabel, input.periodLabel)
+              )
+            )
+            .limit(1);
+
+          if (existing.length > 0) {
+            skipped += 1;
+            continue;
+          }
+
+          const shareCount = alloc.numberOfShares;
+          const amount =
+            schedule.feeType === "per_share"
+              ? (shareCount * Number(schedule.amount)).toFixed(2)
+              : Number(schedule.amount).toFixed(2);
+
+          const invoiceNumber = makeEntryNumber("MFI");
+
+          await tx.insert(membershipFeeInvoices).values({
+            amount,
+            dueDate: new Date(input.dueDate),
+            investorId: alloc.investorId,
+            invoiceNumber,
+            periodEnd: new Date(input.periodEnd),
+            periodLabel: input.periodLabel,
+            periodStart: new Date(input.periodStart),
+            scheduleId: input.scheduleId,
+            shareCount,
+          });
+
+          generated += 1;
+        }
+
+        return { generated, skipped };
+      })
+    ),
+
+  list: protectedProcedure
+    .input(
+      z.object({
+        from: z.string().optional(),
+        investorId: z.string().uuid().optional(),
+        limit: z.number().int().min(1).max(100).default(20),
+        offset: z.number().int().min(0).default(0),
+        scheduleId: z.string().uuid().optional(),
+        status: z.enum(["pending", "paid", "overdue", "waived"]).optional(),
+        to: z.string().optional(),
+      })
+    )
+    .handler(async ({ input }) => {
+      const conditions = [];
+      if (input.scheduleId) {
+        conditions.push(eq(membershipFeeInvoices.scheduleId, input.scheduleId));
+      }
+      if (input.investorId) {
+        conditions.push(eq(membershipFeeInvoices.investorId, input.investorId));
+      }
+      if (input.status) {
+        conditions.push(eq(membershipFeeInvoices.status, input.status));
+      }
+      if (input.from) {
+        conditions.push(
+          sql`${membershipFeeInvoices.dueDate} >= ${new Date(input.from)}`
+        );
+      }
+      if (input.to) {
+        conditions.push(
+          sql`${membershipFeeInvoices.dueDate} <= ${new Date(input.to)}`
+        );
+      }
+
+      const items = await db
+        .select({
+          amount: membershipFeeInvoices.amount,
+          dueDate: membershipFeeInvoices.dueDate,
+          id: membershipFeeInvoices.id,
+          investorId: membershipFeeInvoices.investorId,
+          investorName: investors.name,
+          invoiceNumber: membershipFeeInvoices.invoiceNumber,
+          journalEntryId: membershipFeeInvoices.journalEntryId,
+          notes: membershipFeeInvoices.notes,
+          paidAt: membershipFeeInvoices.paidAt,
+          periodEnd: membershipFeeInvoices.periodEnd,
+          periodLabel: membershipFeeInvoices.periodLabel,
+          periodStart: membershipFeeInvoices.periodStart,
+          scheduleId: membershipFeeInvoices.scheduleId,
+          scheduleName: membershipFeeSchedules.name,
+          shareCount: membershipFeeInvoices.shareCount,
+          status: membershipFeeInvoices.status,
+          waivedReason: membershipFeeInvoices.waivedReason,
+        })
+        .from(membershipFeeInvoices)
+        .innerJoin(
+          investors,
+          eq(membershipFeeInvoices.investorId, investors.id)
+        )
+        .innerJoin(
+          membershipFeeSchedules,
+          eq(membershipFeeInvoices.scheduleId, membershipFeeSchedules.id)
+        )
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(membershipFeeInvoices.dueDate)
+        .limit(input.limit)
+        .offset(input.offset);
+
+      const [countRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(membershipFeeInvoices)
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+      return {
+        items,
+        pagination: {
+          limit: input.limit,
+          offset: input.offset,
+          total: Number(countRow?.count ?? 0),
+        },
+      };
+    }),
+
+  markOverdue: protectedProcedure.input(z.object({})).handler(async () => {
+    const result = await db
+      .update(membershipFeeInvoices)
+      .set({ status: "overdue", updatedAt: new Date() })
+      .where(
+        and(
+          eq(membershipFeeInvoices.status, "pending"),
+          lt(membershipFeeInvoices.dueDate, new Date())
+        )
+      )
+      .returning({ id: membershipFeeInvoices.id });
+
+    return { updated: result.length };
+  }),
+
+  markPaid: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        paidAt: z.string().optional(),
+      })
+    )
+    .handler(async ({ input, context }) =>
+      db.transaction(async (tx) => {
+        const [invoice] = await tx
+          .select()
+          .from(membershipFeeInvoices)
+          .where(eq(membershipFeeInvoices.id, input.id))
+          .limit(1);
+
+        if (!invoice) {
+          throw new ORPCError("NOT_FOUND", { message: "Invoice not found" });
+        }
+        if (invoice.status === "paid" || invoice.status === "waived") {
+          throw new ORPCError("BAD_REQUEST", {
+            message: `Invoice is already ${invoice.status}`,
+          });
+        }
+
+        const [schedule] = await tx
+          .select({
+            cashAccountId: membershipFeeSchedules.cashAccountId,
+            revenueAccountId: membershipFeeSchedules.revenueAccountId,
+          })
+          .from(membershipFeeSchedules)
+          .where(eq(membershipFeeSchedules.id, invoice.scheduleId))
+          .limit(1);
+
+        let journalEntryId: string | undefined;
+
+        if (schedule?.cashAccountId && schedule.revenueAccountId) {
+          const userId = context.session?.user?.id ?? "system";
+          const entryNumber = makeEntryNumber("MFI");
+
+          const [entry] = await tx
+            .insert(journalEntries)
+            .values({
+              createdBy: userId,
+              date: new Date(input.paidAt ?? new Date()),
+              description: `Membership fee payment - ${invoice.invoiceNumber}`,
+              entryNumber,
+              sourceId: invoice.id,
+              sourceType: "membership_fee",
+              status: "posted",
+              totalCredit: invoice.amount,
+              totalDebit: invoice.amount,
+            })
+            .returning();
+
+          if (entry) {
+            const lines = [
+              {
+                accountId: schedule.cashAccountId,
+                amount: invoice.amount,
+                description: "Cash received for membership fee",
+                entryId: entry.id,
+                type: "debit" as const,
+              },
+              {
+                accountId: schedule.revenueAccountId,
+                amount: invoice.amount,
+                description: "Membership fee revenue",
+                entryId: entry.id,
+                type: "credit" as const,
+              },
+            ];
+            await tx.insert(journalEntryLines).values(lines);
+            await updateAccountBalances(tx, lines);
+            journalEntryId = entry.id;
+          }
+        }
+
+        const paidAt = new Date(input.paidAt ?? new Date());
+        const [updated] = await tx
+          .update(membershipFeeInvoices)
+          .set({
+            journalEntryId,
+            paidAt,
+            status: "paid",
+            updatedAt: new Date(),
+          })
+          .where(eq(membershipFeeInvoices.id, input.id))
+          .returning();
+
+        return updated;
+      })
+    ),
+
+  waive: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        reason: z.string().min(1),
+      })
+    )
+    .handler(async ({ input }) => {
+      const [invoice] = await db
+        .select({
+          id: membershipFeeInvoices.id,
+          status: membershipFeeInvoices.status,
+        })
+        .from(membershipFeeInvoices)
+        .where(eq(membershipFeeInvoices.id, input.id))
+        .limit(1);
+
+      if (!invoice) {
+        throw new ORPCError("NOT_FOUND", { message: "Invoice not found" });
+      }
+      if (invoice.status === "paid" || invoice.status === "waived") {
+        throw new ORPCError("BAD_REQUEST", {
+          message: `Invoice is already ${invoice.status}`,
+        });
+      }
+
+      const [updated] = await db
+        .update(membershipFeeInvoices)
+        .set({
+          status: "waived",
+          updatedAt: new Date(),
+          waivedReason: input.reason,
+        })
+        .where(eq(membershipFeeInvoices.id, input.id))
+        .returning();
+
+      return updated;
+    }),
+};
+
+const membershipFeeMembersRouter = {
+  getStatus: protectedProcedure
+    .input(z.object({ investorId: z.string().uuid() }))
+    .handler(async ({ input }) => {
+      const [status] = await db
+        .select()
+        .from(memberStatuses)
+        .where(eq(memberStatuses.investorId, input.investorId))
+        .limit(1);
+
+      return status ?? null;
+    }),
+
+  setStatus: protectedProcedure
+    .input(
+      z.object({
+        investorId: z.string().uuid(),
+        reason: z.string().optional(),
+        status: z.enum(["active", "suspended", "resigned"]),
+      })
+    )
+    .handler(async ({ input }) => {
+      const now = new Date();
+      const values: typeof memberStatuses.$inferInsert = {
+        investorId: input.investorId,
+        status: input.status,
+      };
+      const setValues: Partial<typeof memberStatuses.$inferInsert> = {
+        status: input.status,
+        updatedAt: now,
+      };
+
+      if (input.status === "suspended") {
+        values.suspendedAt = now;
+        values.suspendedReason = input.reason;
+        setValues.suspendedAt = now;
+        setValues.suspendedReason = input.reason;
+        setValues.resignedAt = undefined;
+        setValues.resignedReason = undefined;
+      } else if (input.status === "resigned") {
+        values.resignedAt = now;
+        values.resignedReason = input.reason;
+        setValues.resignedAt = now;
+        setValues.resignedReason = input.reason;
+        setValues.suspendedAt = undefined;
+        setValues.suspendedReason = undefined;
+      } else {
+        setValues.suspendedAt = undefined;
+        setValues.suspendedReason = undefined;
+        setValues.resignedAt = undefined;
+        setValues.resignedReason = undefined;
+      }
+
+      const [upserted] = await db
+        .insert(memberStatuses)
+        .values(values)
+        .onConflictDoUpdate({
+          set: setValues,
+          target: memberStatuses.investorId,
+        })
+        .returning();
+
+      return upserted;
+    }),
+};
+
+const membershipFeeReportRouter = {
+  delinquency: protectedProcedure.input(z.object({})).handler(async () => {
+    const now = new Date();
+    const rows = await db
+      .select({
+        amount: membershipFeeInvoices.amount,
+        dueDate: membershipFeeInvoices.dueDate,
+        id: membershipFeeInvoices.id,
+        investorName: investors.name,
+        invoiceNumber: membershipFeeInvoices.invoiceNumber,
+        scheduleName: membershipFeeSchedules.name,
+        status: membershipFeeInvoices.status,
+      })
+      .from(membershipFeeInvoices)
+      .innerJoin(investors, eq(membershipFeeInvoices.investorId, investors.id))
+      .innerJoin(
+        membershipFeeSchedules,
+        eq(membershipFeeInvoices.scheduleId, membershipFeeSchedules.id)
+      )
+      .where(
+        and(
+          inArray(membershipFeeInvoices.status, ["overdue", "pending"]),
+          lt(membershipFeeInvoices.dueDate, now)
+        )
+      )
+      .orderBy(membershipFeeInvoices.dueDate);
+
+    return rows.map((r) => ({
+      amount: r.amount,
+      daysOverdue: Math.floor(
+        (now.getTime() - r.dueDate.getTime()) / (1000 * 60 * 60 * 24)
+      ),
+      dueDate: r.dueDate,
+      id: r.id,
+      investorName: r.investorName,
+      invoiceNumber: r.invoiceNumber,
+      scheduleName: r.scheduleName,
+      status: r.status,
+    }));
+  }),
+};
+
 export const investmentRouter = {
   capitalCalls: capitalCallsRouter,
   cashFlows: cashFlowsRouter,
   distributions: distributionsRouter,
   investments: investmentsRouter,
   investors: investorsRouter,
+  membershipFees: {
+    invoices: membershipFeeInvoicesRouter,
+    members: membershipFeeMembersRouter,
+    report: membershipFeeReportRouter,
+    schedules: membershipFeeSchedulesRouter,
+  },
   milestones: milestonesRouter,
   payments: paymentsRouter,
   projects: projectsRouter,

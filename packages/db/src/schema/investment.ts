@@ -115,6 +115,25 @@ export const loanStatusEnum = pgEnum("loan_status", [
   "defaulted",
 ]);
 
+export const feeTypeEnum = pgEnum("fee_type", ["flat_per_member", "per_share"]);
+export const billingCycleEnum = pgEnum("billing_cycle", [
+  "monthly",
+  "quarterly",
+  "biannual",
+  "annual",
+]);
+export const feeInvoiceStatusEnum = pgEnum("fee_invoice_status", [
+  "pending",
+  "paid",
+  "overdue",
+  "waived",
+]);
+export const memberStatusEnum = pgEnum("member_status", [
+  "active",
+  "suspended",
+  "resigned",
+]);
+
 export const investmentProjects = pgTable("investment_projects", {
   accountingAssetAccountId: uuid("accounting_asset_account_id"),
   accountingEquityAccountId: uuid("accounting_equity_account_id"),
@@ -454,3 +473,83 @@ export const shareholderPaymentsRelations = relations(
     }),
   })
 );
+
+export const membershipFeeSchedules = pgTable("membership_fee_schedules", {
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  billingCycle: billingCycleEnum("billing_cycle").notNull(),
+  cashAccountId: uuid("cash_account_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  description: text("description"),
+  feeType: feeTypeEnum("fee_type").notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  isActive: boolean("is_active").default(true).notNull(),
+  name: text("name").notNull(),
+  notes: text("notes"),
+  revenueAccountId: uuid("revenue_account_id"),
+  shareClassId: uuid("share_class_id").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const membershipFeeSchedulesRelations = relations(
+  membershipFeeSchedules,
+  ({ one, many }) => ({
+    invoices: many(membershipFeeInvoices),
+    shareClass: one(shareClasses, {
+      fields: [membershipFeeSchedules.shareClassId],
+      references: [shareClasses.id],
+    }),
+  })
+);
+
+export const membershipFeeInvoices = pgTable("membership_fee_invoices", {
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  investorId: uuid("investor_id").notNull(),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  journalEntryId: uuid("journal_entry_id"),
+  notes: text("notes"),
+  paidAt: timestamp("paid_at"),
+  periodEnd: timestamp("period_end").notNull(),
+  periodLabel: text("period_label").notNull(),
+  periodStart: timestamp("period_start").notNull(),
+  scheduleId: uuid("schedule_id").notNull(),
+  shareCount: integer("share_count").notNull(),
+  status: feeInvoiceStatusEnum("status").default("pending").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  waivedReason: text("waived_reason"),
+});
+
+export const membershipFeeInvoicesRelations = relations(
+  membershipFeeInvoices,
+  ({ one }) => ({
+    investor: one(investors, {
+      fields: [membershipFeeInvoices.investorId],
+      references: [investors.id],
+    }),
+    schedule: one(membershipFeeSchedules, {
+      fields: [membershipFeeInvoices.scheduleId],
+      references: [membershipFeeSchedules.id],
+    }),
+  })
+);
+
+export const memberStatuses = pgTable("member_statuses", {
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  investorId: uuid("investor_id").notNull().unique(),
+  resignedAt: timestamp("resigned_at"),
+  resignedReason: text("resigned_reason"),
+  status: memberStatusEnum("status").default("active").notNull(),
+  suspendedAt: timestamp("suspended_at"),
+  suspendedReason: text("suspended_reason"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const memberStatusesRelations = relations(memberStatuses, ({ one }) => ({
+  investor: one(investors, {
+    fields: [memberStatuses.investorId],
+    references: [investors.id],
+  }),
+}));

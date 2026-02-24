@@ -9,10 +9,12 @@ import {
   CheckSquare,
   CreditCard,
   DollarSign,
+  FileText,
   FolderOpen,
   Layers,
   LayoutDashboard,
   PhoneCall,
+  Receipt,
   TrendingUp,
   UserCheck,
   Users,
@@ -35,6 +37,8 @@ const navigation = [
   { href: "/investment/shareholders", icon: UserCheck, name: "Shareholders" },
   { href: "/investment/capital-calls", icon: PhoneCall, name: "Capital Calls" },
   { href: "/investment/payments", icon: CreditCard, name: "Payments" },
+  { href: "/investment/fee-schedules", icon: Receipt, name: "Fee Schedules" },
+  { href: "/investment/fee-invoices", icon: FileText, name: "Fee Invoices" },
 ] as const;
 
 function InvestmentLayout() {

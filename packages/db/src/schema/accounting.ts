@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import {
   boolean,
   decimal,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -43,6 +44,7 @@ export const journalSourceTypeEnum = pgEnum("journal_source_type", [
   "manual",
   "return",
   "purchase_order",
+  "membership_fee",
 ]);
 
 export const entryLineTypeEnum = pgEnum("entry_line_type", ["debit", "credit"]);
@@ -120,29 +122,38 @@ export const accountingPeriodsRelations = relations(
   })
 );
 
-export const journalEntries = pgTable("journal_entries", {
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  createdBy: text("created_by").notNull(),
-  date: timestamp("date").notNull(),
-  description: text("description").notNull(),
-  entryNumber: text("entry_number").notNull().unique(),
-  id: uuid("id").primaryKey().defaultRandom(),
-  periodId: uuid("period_id"),
-  postedAt: timestamp("posted_at"),
-  reference: text("reference"),
-  sourceId: uuid("source_id"),
-  sourceType: journalSourceTypeEnum("source_type").notNull(),
-  status: journalEntryStatusEnum("status").default("draft").notNull(),
-  totalCredit: decimal("total_credit", { precision: 15, scale: 2 })
-    .default("0")
-    .notNull(),
-  totalDebit: decimal("total_debit", { precision: 15, scale: 2 })
-    .default("0")
-    .notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  voidedAt: timestamp("voided_at"),
-  voidReason: text("void_reason"),
-});
+export const journalEntries = pgTable(
+  "journal_entries",
+  {
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdBy: text("created_by").notNull(),
+    date: timestamp("date").notNull(),
+    description: text("description").notNull(),
+    entryNumber: text("entry_number").notNull().unique(),
+    id: uuid("id").primaryKey().defaultRandom(),
+    periodId: uuid("period_id"),
+    postedAt: timestamp("posted_at"),
+    reference: text("reference"),
+    sourceId: uuid("source_id"),
+    sourceType: journalSourceTypeEnum("source_type").notNull(),
+    status: journalEntryStatusEnum("status").default("draft").notNull(),
+    totalCredit: decimal("total_credit", { precision: 15, scale: 2 })
+      .default("0")
+      .notNull(),
+    totalDebit: decimal("total_debit", { precision: 15, scale: 2 })
+      .default("0")
+      .notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    voidedAt: timestamp("voided_at"),
+    voidReason: text("void_reason"),
+  },
+  (t) => [
+    index("je_status_idx").on(t.status),
+    index("je_source_type_idx").on(t.sourceType),
+    index("je_period_id_idx").on(t.periodId),
+    index("je_date_idx").on(t.date),
+  ]
+);
 
 export const journalEntriesRelations = relations(
   journalEntries,
@@ -155,15 +166,22 @@ export const journalEntriesRelations = relations(
   })
 );
 
-export const journalEntryLines = pgTable("journal_entry_lines", {
-  accountId: uuid("account_id").notNull(),
-  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  description: text("description"),
-  entryId: uuid("entry_id").notNull(),
-  id: uuid("id").primaryKey().defaultRandom(),
-  type: entryLineTypeEnum("type").notNull(),
-});
+export const journalEntryLines = pgTable(
+  "journal_entry_lines",
+  {
+    accountId: uuid("account_id").notNull(),
+    amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    description: text("description"),
+    entryId: uuid("entry_id").notNull(),
+    id: uuid("id").primaryKey().defaultRandom(),
+    type: entryLineTypeEnum("type").notNull(),
+  },
+  (t) => [
+    index("jel_entry_id_idx").on(t.entryId),
+    index("jel_account_id_idx").on(t.accountId),
+  ]
+);
 
 export const journalEntryLinesRelations = relations(
   journalEntryLines,
@@ -179,22 +197,30 @@ export const journalEntryLinesRelations = relations(
   })
 );
 
-export const expenses = pgTable("expenses", {
-  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
-  categoryAccountId: uuid("category_account_id").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  createdBy: text("created_by").notNull(),
-  date: timestamp("date").notNull(),
-  description: text("description").notNull(),
-  expenseNumber: text("expense_number").notNull().unique(),
-  id: uuid("id").primaryKey().defaultRandom(),
-  notes: text("notes"),
-  paymentAccountId: uuid("payment_account_id").notNull(),
-  periodId: uuid("period_id"),
-  status: expenseStatusEnum("status").default("pending").notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  vendorName: text("vendor_name"),
-});
+export const expenses = pgTable(
+  "expenses",
+  {
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    categoryAccountId: uuid("category_account_id").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdBy: text("created_by").notNull(),
+    date: timestamp("date").notNull(),
+    description: text("description").notNull(),
+    expenseNumber: text("expense_number").notNull().unique(),
+    id: uuid("id").primaryKey().defaultRandom(),
+    notes: text("notes"),
+    paymentAccountId: uuid("payment_account_id").notNull(),
+    periodId: uuid("period_id"),
+    status: expenseStatusEnum("status").default("pending").notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    vendorName: text("vendor_name"),
+  },
+  (t) => [
+    index("exp_status_idx").on(t.status),
+    index("exp_period_id_idx").on(t.periodId),
+    index("exp_date_idx").on(t.date),
+  ]
+);
 
 export const expensesRelations = relations(expenses, ({ one }) => ({
   categoryAccount: one(accounts, {
