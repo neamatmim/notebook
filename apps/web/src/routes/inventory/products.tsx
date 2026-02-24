@@ -70,14 +70,22 @@ function ProductsPage() {
   const columns: ColumnDef<(typeof products)[number]>[] = [
     {
       accessorKey: "name",
-      cell: ({ row }) => (
-        <div>
-          <div className="font-medium">{row.original.name}</div>
-          <div className="text-muted-foreground text-sm">
-            SKU: {row.original.sku}
+      cell: ({ row }) => {
+        const count = Number(row.original.variantCount ?? 0);
+        return (
+          <div>
+            <div className="font-medium">{row.original.name}</div>
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <span>SKU: {row.original.sku}</span>
+              {count > 0 && (
+                <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                  {count} variant{count !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
       header: "Product",
     },
     {
@@ -106,11 +114,24 @@ function ProductsPage() {
     },
     {
       accessorKey: "status",
-      cell: ({ row }) => (
-        <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800 dark:bg-green-900/50 dark:text-green-300">
-          {row.original.status}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const s = row.original.status ?? "active";
+        const colors: Record<string, string> = {
+          active:
+            "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
+          discontinued:
+            "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+          inactive:
+            "bg-gray-100 text-gray-800 dark:bg-gray-900/50 dark:text-gray-300",
+        };
+        return (
+          <span
+            className={`rounded-full px-2 py-1 text-xs font-semibold ${colors[s] ?? colors.active}`}
+          >
+            {s}
+          </span>
+        );
+      },
       header: "Status",
     },
     {

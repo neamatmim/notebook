@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -16,19 +16,31 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { queryClient, orpc } from "@/utils/orpc";
+import { orpc, queryClient } from "@/utils/orpc";
 
 interface CategoryFormData {
   description: string;
   name: string;
+  parentId: string;
 }
 
-const emptyForm: CategoryFormData = { description: "", name: "" };
+const emptyForm: CategoryFormData = { description: "", name: "", parentId: "" };
 
 interface CategoryFormDialogProps {
   editId?: string | null;
-  editData?: { description?: string | null; name: string } | null;
+  editData?: {
+    description?: string | null;
+    name: string;
+    parentId?: string | null;
+  } | null;
   onClose: () => void;
   open: boolean;
 }
@@ -42,11 +54,19 @@ export function CategoryFormDialog({
   const [form, setForm] = useState<CategoryFormData>(emptyForm);
   const isEdit = Boolean(editId);
 
+  const categoriesQuery = useQuery({
+    ...orpc.inventory.categories.list.queryOptions({
+      input: { limit: 100, offset: 0 },
+    }),
+    enabled: open,
+  });
+
   useEffect(() => {
     if (editData && editId) {
       setForm({
         description: editData.description ?? "",
         name: editData.name,
+        parentId: editData.parentId ?? "",
       });
     } else if (!editId) {
       setForm(emptyForm);
@@ -95,6 +115,7 @@ export function CategoryFormDialog({
     const payload = {
       description: form.description || undefined,
       name: form.name,
+      parentId: form.parentId || undefined,
     };
     if (isEdit && editId) {
       updateMutation.mutate({ ...payload, id: editId });
@@ -135,6 +156,32 @@ export function CategoryFormDialog({
               }
               placeholder="Category name"
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cat-parent">Parent Category</Label>
+            <Select
+              value={form.parentId || "__none__"}
+              onValueChange={(v) =>
+                setForm((prev) => ({
+                  ...prev,
+                  parentId: v === "__none__" ? "" : (v ?? ""),
+                }))
+              }
+            >
+              <SelectTrigger id="cat-parent">
+                <SelectValue placeholder="None (top-level)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None (top-level)</SelectItem>
+                {(categoriesQuery.data?.items ?? [])
+                  .filter((c) => c.id !== editId)
+                  .map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="cat-desc">Description</Label>

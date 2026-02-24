@@ -20,6 +20,7 @@ function CategoriesPage() {
   const [editData, setEditData] = useState<{
     description?: string;
     name: string;
+    parentId?: string;
   } | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -72,6 +73,7 @@ function CategoriesPage() {
               setEditData({
                 description: row.original.description ?? undefined,
                 name: row.original.name,
+                parentId: row.original.parentId ?? undefined,
               });
               setFormOpen(true);
             }}

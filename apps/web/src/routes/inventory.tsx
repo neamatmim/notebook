@@ -6,7 +6,12 @@ import {
 } from "@tanstack/react-router";
 import {
   BarChart3,
+  Boxes,
+  ClipboardList,
+  Database,
   FolderTree,
+  History,
+  Layers,
   MapPin,
   Package,
   Settings,
@@ -32,7 +37,20 @@ const navigation = [
     icon: TrendingUp,
     name: "Stock Movements",
   },
+  {
+    href: "/inventory/stock-levels",
+    icon: Database,
+    name: "Stock Levels",
+  },
+  { href: "/inventory/variants", icon: Boxes, name: "Variants" },
+  { href: "/inventory/batches", icon: Layers, name: "Batches" },
+  {
+    href: "/inventory/cycle-counts",
+    icon: ClipboardList,
+    name: "Cycle Counts",
+  },
   { href: "/inventory/locations", icon: MapPin, name: "Locations" },
+  { href: "/inventory/audit-log", icon: History, name: "Audit Log" },
   { href: "/inventory/settings", icon: Settings, name: "Settings" },
 ] as const;
 

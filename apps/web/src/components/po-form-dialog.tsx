@@ -16,6 +16,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { queryClient, orpc } from "@/utils/orpc";
 
@@ -23,9 +30,122 @@ interface LineItem {
   productId: string;
   quantity: string;
   unitCost: string;
+  variantId: string;
 }
 
-const emptyLine: LineItem = { productId: "", quantity: "1", unitCost: "" };
+const emptyLine: LineItem = {
+  productId: "",
+  quantity: "1",
+  unitCost: "",
+  variantId: "",
+};
+
+function POLineItemRow({
+  index,
+  item,
+  isOnly,
+  products,
+  onUpdate,
+  onRemove,
+}: {
+  index: number;
+  isOnly: boolean;
+  item: LineItem;
+  onRemove: () => void;
+  onUpdate: (field: keyof LineItem, value: string) => void;
+  products: { id: string; name: string; sku: string }[];
+}) {
+  const variantsQuery = useQuery({
+    ...orpc.inventory.products.variants.list.queryOptions({
+      input: { productId: item.productId },
+    }),
+    enabled: Boolean(item.productId),
+  });
+
+  const variants = variantsQuery.data ?? [];
+
+  return (
+    <div className="flex items-end gap-2">
+      <div className="flex-1 space-y-1">
+        {index === 0 && <Label className="text-xs">Product</Label>}
+        <Select
+          value={item.productId || "__none__"}
+          onValueChange={(v) => {
+            const val = v === "__none__" ? "" : (v ?? "");
+            onUpdate("productId", val);
+            onUpdate("variantId", "");
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select product" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">Select product</SelectItem>
+            {products.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name} ({p.sku})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {item.productId && variants.length > 0 && (
+          <Select
+            value={item.variantId || "__none__"}
+            onValueChange={(v) =>
+              onUpdate("variantId", v === "__none__" ? "" : (v ?? ""))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Any variant (no specific)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">
+                Any variant (no specific)
+              </SelectItem>
+              {variants.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  {v.name} — {v.sku}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+      <div className="w-20">
+        {index === 0 && <Label className="text-xs">Qty</Label>}
+        <Input
+          type="number"
+          min="1"
+          required
+          value={item.quantity}
+          onChange={(e) => onUpdate("quantity", e.target.value)}
+        />
+      </div>
+      <div className="w-28">
+        {index === 0 && <Label className="text-xs">Unit Cost</Label>}
+        <Input
+          type="number"
+          step="0.01"
+          min="0.01"
+          required
+          value={item.unitCost}
+          onChange={(e) => onUpdate("unitCost", e.target.value)}
+          placeholder="0.00"
+        />
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="text-red-600 hover:text-red-700"
+        onClick={onRemove}
+        disabled={isOnly}
+      >
+        <Trash2 className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+}
 
 interface POFormDialogProps {
   onClose: () => void;
@@ -118,6 +238,7 @@ export function POFormDialog({ open, onClose }: POFormDialogProps) {
         productId: item.productId,
         quantity: Number(item.quantity),
         unitCost: item.unitCost,
+        variantId: item.variantId || undefined,
       })),
       notes: notes || undefined,
       supplierId,
@@ -146,20 +267,21 @@ export function POFormDialog({ open, onClose }: POFormDialogProps) {
               <Label htmlFor="po-supplier">
                 Supplier <span className="text-red-500">*</span>
               </Label>
-              <select
-                id="po-supplier"
-                required
+              <Select
                 value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
-                className="border-input bg-background flex h-8 w-full rounded-none border px-2.5 py-1 text-xs outline-none"
+                onValueChange={(v) => setSupplierId(v ?? "")}
               >
-                <option value="">Select a supplier</option>
-                {(suppliersQuery.data?.items ?? []).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="po-supplier">
+                  <SelectValue placeholder="Select a supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(suppliersQuery.data?.items ?? []).map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {selectedSupplier?.paymentTermsDays !== null &&
                 selectedSupplier?.paymentTermsDays !== undefined && (
                   <p className="text-muted-foreground text-xs">
@@ -210,64 +332,15 @@ export function POFormDialog({ open, onClose }: POFormDialogProps) {
             </div>
             <div className="space-y-2">
               {items.map((item, index) => (
-                <div key={index} className="flex items-end gap-2">
-                  <div className="flex-1">
-                    {index === 0 && <Label className="text-xs">Product</Label>}
-                    <select
-                      required
-                      value={item.productId}
-                      onChange={(e) =>
-                        updateItem(index, "productId", e.target.value)
-                      }
-                      className="border-input bg-background flex h-8 w-full rounded-none border px-2.5 py-1 text-xs outline-none"
-                    >
-                      <option value="">Select product</option>
-                      {(productsQuery.data?.items ?? []).map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.sku})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="w-20">
-                    {index === 0 && <Label className="text-xs">Qty</Label>}
-                    <Input
-                      type="number"
-                      min="1"
-                      required
-                      value={item.quantity}
-                      onChange={(e) =>
-                        updateItem(index, "quantity", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="w-28">
-                    {index === 0 && (
-                      <Label className="text-xs">Unit Cost</Label>
-                    )}
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      required
-                      value={item.unitCost}
-                      onChange={(e) =>
-                        updateItem(index, "unitCost", e.target.value)
-                      }
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="text-red-600 hover:text-red-700"
-                    onClick={() => removeItem(index)}
-                    disabled={items.length === 1}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
+                <POLineItemRow
+                  key={index}
+                  index={index}
+                  item={item}
+                  isOnly={items.length === 1}
+                  products={productsQuery.data?.items ?? []}
+                  onUpdate={(field, value) => updateItem(index, field, value)}
+                  onRemove={() => removeItem(index)}
+                />
               ))}
             </div>
             <div className="text-right text-sm font-medium">

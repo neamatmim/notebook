@@ -30,11 +30,14 @@ import { queryClient, orpc } from "@/utils/orpc";
 import { printReceipt } from "@/utils/print-receipt";
 
 export interface CartItem {
-  id: string;
+  cartKey: string; // `${productId}:${variantId || ""}` — used for dedup/update/remove
+  id: string; // productId
   name: string;
   price: number;
   quantity: number;
   sku: string;
+  variantId?: string;
+  variantName?: string;
 }
 
 type PaymentMethod =
@@ -61,6 +64,7 @@ interface CheckoutDialogProps {
   onClose: () => void;
   onSuccess: () => void;
   open: boolean;
+  shiftId?: string;
   subtotal: number;
   tax: number;
   total: number;
@@ -100,6 +104,7 @@ export function CheckoutDialog({
   onSuccess,
   cart,
   locationId,
+  shiftId,
   subtotal,
   tax,
   total,
@@ -459,6 +464,7 @@ export function CheckoutDialog({
         productId: item.id,
         quantity: item.quantity,
         unitPrice: item.price.toString(),
+        variantId: item.variantId || undefined,
       })),
       locationId,
       loyaltyPointsUsed: loyaltyPointsToRedeem,
@@ -468,6 +474,7 @@ export function CheckoutDialog({
         giftCardNumber: l.giftCardNumber,
         method: l.method,
       })),
+      shiftId: shiftId || undefined,
     });
   };
 
