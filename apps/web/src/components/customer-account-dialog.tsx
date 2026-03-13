@@ -1,3 +1,9 @@
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@notebook/ui/components/dialog";
 import { useQuery } from "@tanstack/react-query";
 import {
   Banknote,
@@ -13,12 +19,6 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { orpc } from "@/utils/orpc";
 
 interface CustomerAccountDialogProps {
@@ -417,7 +417,7 @@ export function CustomerAccountDialog({
                           <td className="py-2 text-right font-mono text-green-700">
                             {fmt(
                               data?.recentSales.reduce(
-                                (sum, s) => sum + Number(s.totalAmount),
+                                (sum, sale) => sum + Number(sale.totalAmount),
                                 0
                               )
                             )}

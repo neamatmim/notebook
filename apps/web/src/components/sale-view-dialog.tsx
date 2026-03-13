@@ -1,10 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Printer, XCircle } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
-
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@notebook/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@notebook/ui/components/card";
 import {
   Dialog,
   DialogContent,
@@ -12,9 +12,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@notebook/ui/components/dialog";
+import { Input } from "@notebook/ui/components/input";
+import { Label } from "@notebook/ui/components/label";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Printer, XCircle } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+
 import { orpc } from "@/utils/orpc";
 import { printReceipt } from "@/utils/print-receipt";
 

@@ -1,13 +1,15 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import { createRouter } from "@tanstack/react-router";
 
-import "./index.css";
+// import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
+// import "./styles.css";
 import Loader from "./components/loader";
 import { routeTree } from "./routeTree.gen";
 import { orpc, queryClient } from "./utils/orpc";
 
 export const getRouter = () => {
-  const router = createTanStackRouter({
+  //  const queryClient = new QueryClient();
+  const router = createRouter({
     Wrap: ({ children }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     ),
@@ -15,9 +17,11 @@ export const getRouter = () => {
     defaultNotFoundComponent: () => <div>Not Found</div>,
     defaultPendingComponent: () => <Loader />,
     defaultPreloadStaleTime: 0,
+    // defaultPreload: "intent",
     routeTree,
     scrollRestoration: true,
   });
+  // setupRouterSsrQueryIntegration({ router, queryClient });
   return router;
 };
 

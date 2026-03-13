@@ -1,13 +1,4 @@
-import type { FormEvent } from "react";
-
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { CheckCircle2, Loader2, Printer, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-
-import type { ReceiptItem } from "@/utils/print-receipt";
-
-import { Button } from "@/components/ui/button";
+import { Button } from "@notebook/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -15,18 +6,25 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@notebook/ui/components/dialog";
+import { Input } from "@notebook/ui/components/input";
+import { Label } from "@notebook/ui/components/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "@notebook/ui/components/select";
+import { Textarea } from "@notebook/ui/components/textarea";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { CheckCircle2, Loader2, Printer, X } from "lucide-react";
+import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+
 import { queryClient, orpc } from "@/utils/orpc";
+import type { ReceiptItem } from "@/utils/print-receipt";
 import { printReceipt } from "@/utils/print-receipt";
 
 export interface CartItem {

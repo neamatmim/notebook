@@ -7,22 +7,31 @@
       "packages/*"
     ],
     "catalog": {
-      "dotenv": "^17.2.2",
-      "zod": "^4.1.13",
+      "@tanstack/react-table": "^8.21.3",
+      "@tanstack/react-router": "^1.163.3",
+      "dotenv": "^17.3.1",
+      "lucide-react": "^0.575.0",
+      "react": "19.2.4",
+      "sonner": "2.0.7",
+      "zod": "^4.3.6",
+      "type-fest": "5.4.4",
+      "es-toolkit": "1.44.0",
+      "vite": "^7.3.1",
       "typescript": "^5",
-      "@types/node": "^22.13.14",
-      "@orpc/server": "^1.12.2",
-      "@orpc/client": "^1.12.2",
-      "@orpc/openapi": "^1.12.2",
-      "@orpc/zod": "^1.12.2",
-      "better-auth": "^1.4.18",
-      "drizzle-orm": "^0.45.1",
-      "@types/pg": "^8.16.0"
+      "@types/pg": "^8.18.0",
+      "@types/react": "19.2.14",
+      "@types/node": "^25.3.2",
+      "@orpc/server": "^1.13.5",
+      "@orpc/client": "^1.13.5",
+      "@orpc/openapi": "^1.13.5",
+      "@orpc/zod": "^1.13.5",
+      "better-auth": "^1.5.4",
+      "drizzle-orm": "^0.45.1"
     }
   },
   "type": "module",
   "scripts": {
-    "clean": "git clean -xdf node_modules",
+    "clean": "git clean -xdf node_modules .turbo .vercel",
     "clean:workspaces": "turbo run clean",
     "dev": "turbo dev",
     "build": "turbo build",
@@ -37,27 +46,21 @@
     "db:watch": "turbo -F @notebook/db db:watch",
     "db:stop": "turbo -F @notebook/db db:stop",
     "db:down": "turbo -F @notebook/db db:down",
-    "check": "ultracite check",
-    "fix": "ultracite fix",
     "prepare": "husky",
     "ruler:apply": "bunx @intellectronica/ruler@latest apply --local-only"
   },
   "dependencies": {
-    "@notebook/env": "workspace:*",
-    "dotenv": "catalog:",
-    "nitro": "npm:nitro-nightly@latest",
-    "zod": "catalog:"
+    "nitro": "npm:nitro-nightly@latest"
   },
   "devDependencies": {
-    "@notebook/config": "workspace:*",
     "@types/node": "catalog:",
     "husky": "latest",
     "lint-staged": "latest",
     "oxfmt": "latest",
     "oxlint": "latest",
-    "turbo": "^2.6.3",
+    "turbo": "latest",
     "typescript": "catalog:",
-    "ultracite": "7.2.1"
+    "ultracite": "7.2.4"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,json,jsonc,css,scss,md,mdx}": [

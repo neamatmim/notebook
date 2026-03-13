@@ -28,6 +28,7 @@
     "max-statements": "off",
     "complexity": "off",
     "react/no-array-index-key": "off",
-    "react/jsx-pascal-case": "off"
+    "react/jsx-pascal-case": "off",
+    "no-use-before-define": "off"
   }
 }

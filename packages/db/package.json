@@ -22,21 +22,21 @@
     "db:watch": "docker compose up",
     "db:stop": "docker compose stop",
     "db:down": "docker compose down",
-    "seed": "bun run src/seed.ts",
-    "seed:inventory": "bun run src/seed-inventory.ts"
+    "db:seed": "bun run src/seed.ts",
+    "create-admin": "bun run src/create-admin.ts"
   },
   "dependencies": {
+    "@noble/hashes": "^2.0.1",
     "@notebook/env": "workspace:*",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
-    "pg": "^8.17.1",
-    "postgres": "^3.4.8",
+    "pg": "^8.20.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@notebook/config": "workspace:*",
-    "@types/pg": "catalog:",
-    "drizzle-kit": "^0.31.8",
+    "@types/pg": "^8.18.0",
+    "drizzle-kit": "^0.31.9",
     "typescript": "catalog:"
   }
 }

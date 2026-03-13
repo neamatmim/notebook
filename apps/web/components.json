@@ -5,16 +5,17 @@
   "tsx": true,
   "tailwind": {
     "config": "",
-    "css": "src/index.css",
-    "baseColor": "neutral",
+    "css": "../../packages/ui/src/styles.css",
+    "baseColor": "gray",
     "cssVariables": true,
     "prefix": ""
   },
   "iconLibrary": "lucide",
+  "rtl": false,
   "aliases": {
     "components": "@/components",
-    "utils": "@/lib/utils",
-    "ui": "@/components/ui",
+    "utils": "@notebook/ui/lib/utils",
+    "ui": "@notebook/ui/components",
     "lib": "@/lib",
     "hooks": "@/hooks"
   },

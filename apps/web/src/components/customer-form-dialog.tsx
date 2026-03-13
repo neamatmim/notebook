@@ -1,11 +1,4 @@
-import type { FormEvent } from "react";
-
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-
-import { Button } from "@/components/ui/button";
+import { Button } from "@notebook/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -13,10 +6,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@notebook/ui/components/dialog";
+import { Input } from "@notebook/ui/components/input";
+import { Label } from "@notebook/ui/components/label";
+import { Textarea } from "@notebook/ui/components/textarea";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
+import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+
 import { queryClient, orpc } from "@/utils/orpc";
 
 interface CustomerFormData {

@@ -274,3 +274,5 @@ notebook/
   Bottom line: The foundation — schema design, transactional stock mutations, cost methods, partial payments, and
   accounting hooks — is well-architected. The three critical gaps (COGS posting, stock_levels uniqueness, PO number
   safety) need to be fixed before going live. The RBAC gap is the most significant operational risk. -->
+
+<!-- we want to build an full fledged Enterprise grade highly scalable ERP solution which can be used by any business, any govrnment organization we need to serve them with the best possible ERP solution. we need to serve 1000 of clients and they will have different requirements and different workflows and different business logic. so we need to build a solution which is highly flexible and customizable. configurable. think hard and design a solution which can serve all the requirements of all the clients.  -->

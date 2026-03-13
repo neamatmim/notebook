@@ -1,0 +1,7 @@
+{
+  "extends": "@notebook/config/tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "strictNullChecks": true
+  }
+}

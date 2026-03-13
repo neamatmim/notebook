@@ -1,0 +1,9 @@
+{
+  "extends": "@notebook/config/tsconfig.base.json",
+  "compilerOptions": {
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "jsx": "preserve",
+    "strictNullChecks": true
+  }
+}
